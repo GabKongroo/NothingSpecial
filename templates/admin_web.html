@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Gestione Beat - Admin</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="apple-touch-icon" href="/static/icon.png" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+</head>
+<body>
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <p>Salvataggio in corso...</p>
+    </div>
+  </div>
+
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <div class="logo-section">
+        <div class="logo-icon">🎵</div>
+        <h2>Gestione Beat</h2>
+      </div>
+      {% if session.get('logged_in') %}
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+          <button type="submit" class="logout-btn">
+            <span class="logout-icon">🚪</span>
+            <span class="logout-text">Logout</span>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="center-container">
+    {% if session.get('logged_in') %}
+      <!-- Barra di ricerca -->
+      <form method="get" action="{{ url_for('index') }}" class="search-bar" style="margin-bottom: 32px; display: flex; justify-content: center;">
+        <input
+          type="text"
+          name="q"
+          value="{{ request.args.get('q', '') }}"
+          placeholder="Cerca beat per nome..."
+          class="search-input"
+          style="padding: 12px 18px; border-radius: 12px 0 0 12px; border: 2px solid #e5e5e7; font-size: 16px; min-width: 220px; max-width: 340px; outline: none;"
+        />
+        <button type="submit" class="search-btn" style="padding: 12px 22px; border-radius: 0 12px 12px 0; border: 2px solid #e5e5e7; border-left: none; background: linear-gradient(135deg, #007aff, #5856d6); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;">
+          🔍
+        </button>
+      </form>
+    {% endif %}
+    {% if not session.get('logged_in') %}
+      <div class="login-container">
+        <div class="login-card">
+          <div class="login-header">
+            <div class="login-icon">🔐</div>
+            <h3>Accesso Amministratore</h3>
+            <p>Inserisci la password per accedere al pannello</p>
+          </div>
+          <form method="post" action="{{ url_for('login') }}" class="login-form">
+            <div class="input-group">
+              <input type="password" name="password" placeholder="Password admin" required />
+              <span class="input-icon">🔑</span>
+            </div>
+            <button type="submit" class="login-submit">Accedi</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <div class="beat-card-list">
+        {% if error and not error_beat_id %}
+          <div class="error error-global">
+            <span class="error-icon">⚠️</span>
+            <span>{{ error }}</span>
+          </div>
+        {% endif %}
+
+        {% for beat in beats %}
+        <form method="post" action="{{ url_for('index') }}" class="beat-form">
+          <div class="beat-card" id="beat-card-{{ beat.id }}" data-beat-id="{{ beat.id }}">
+            <div class="beat-header">
+              <div class="beat-info">
+                <h3 class="beat-title">{{ beat.title }}</h3>
+                <div class="beat-badges">
+                  <span class="badge badge-genre">{{ beat.genre }}</span>
+                  <span class="badge badge-mood">{{ beat.mood }}</span>
+                  {% if beat.is_exclusive %}
+                    <span class="badge badge-exclusive">Esclusivo</span>
+                  {% endif %}
+                  {% if beat.is_discounted %}
+                    <span class="badge badge-discount">-{{ beat.discount_percent }}%</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="beat-id">ID: {{ beat.id }}</div>
+            </div>
+
+            <!-- Error container per questo beat -->
+            <div class="beat-error-container" id="error-container-{{ beat.id }}" style="display: none;">
+              <div class="beat-error">
+                <span class="error-icon">❌</span>
+                <span class="error-message"></span>
+              </div>
+            </div>
+
+            <div class="beat-fields">
+              <div class="field-row">
+                <div class="beat-field">
+                  <label class="beat-label">Prezzo Originale (€)</label>
+                  <input type="number" step="0.01" min="0" name="original_price_{{ beat.id }}"
+                    value="{% if request.method == 'POST' and error_beat_id == beat.id %}{{ request.form['original_price_' ~ beat.id] }}{% else %}{{ beat.original_price or beat.price }}{% endif %}"
+                    class="original-price" data-id="{{ beat.id }}" />
+                </div>
+
+                <div class="beat-field">
+                  <label class="beat-label">Prezzo Scontato (€)</label>
+                  <input type="number" step="0.01" min="0" name="discounted_price_{{ beat.id }}"
+                    value="{% if request.method == 'POST' and error_beat_id == beat.id %}{{ request.form['discounted_price_' ~ beat.id] }}{% else %}{{ beat.discounted_price or (beat.price if beat.is_discounted else '') }}{% endif %}"
+                    class="discounted-price" data-id="{{ beat.id }}"
+                    {% if not beat.is_discounted and (not (request.method == 'POST' and error_beat_id == beat.id and request.form.get('is_discounted_' ~ beat.id))) %}disabled{% endif %} />
+                </div>
+
+                <div class="beat-field">
+                  <label class="beat-label">% Sconto</label>
+                  <input type="number" name="discount_percent_{{ beat.id }}" min="0" max="100"
+                    value="{% if request.method == 'POST' and error_beat_id == beat.id %}{{ request.form['discount_percent_' ~ beat.id] }}{% else %}{{ beat.discount_percent or 0 }}{% endif %}"
+                    class="discount-percent" data-id="{{ beat.id }}" readonly tabindex="-1"
+                    style="background:#f5f5f5; color:#888; cursor:not-allowed;" />
+                </div>
+              </div>
+
+              <div class="field-row checkbox-row">
+                <div class="checkbox-field">
+                  <input type="hidden" name="is_exclusive_{{ beat.id }}" value="0" />
+                  <input type="checkbox" name="is_exclusive_{{ beat.id }}" value="1"
+                         id="exclusive-{{ beat.id }}" {% if beat.is_exclusive %}checked{% endif %} />
+                  <label for="exclusive-{{ beat.id }}" class="checkbox-label">
+                    <span class="checkbox-custom"></span>
+                    <span>Esclusivo</span>
+                  </label>
+                </div>
+
+                <div class="checkbox-field">
+                  <input type="hidden" name="is_discounted_{{ beat.id }}" value="0" />
+                  <input type="checkbox" name="is_discounted_{{ beat.id }}" value="1"
+                         id="discounted-{{ beat.id }}" {% if beat.is_discounted %}checked{% endif %} 
+                         class="is-discounted" data-id="{{ beat.id }}" />
+                  <label for="discounted-{{ beat.id }}" class="checkbox-label">
+                    <span class="checkbox-custom"></span>
+                    <span>Scontato</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {% if error_beat_id and error_beat_id == beat.id %}
+              <div class="error beat-specific-error">
+                <span class="error-icon">⚠️</span>
+                <span>{{ error }}</span>
+              </div>
+            {% endif %}
+
+            <div class="beat-actions">
+              <button type="submit" class="save-single-btn" data-beat-id="{{ beat.id }}">
+                <span class="btn-icon">💾</span>
+                <span class="btn-text">Salva</span>
+                <div class="btn-loading" style="display: none;">
+                  <div class="btn-spinner"></div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </form>
+        {% endfor %}
+      </div>
+
+      <div class="save-all-container">
+        <button type="button" id="save-all-btn" class="save-all-btn">
+          <span class="btn-icon">✅</span>
+          <span class="btn-text">Salva Tutti i Cambiamenti</span>
+          <div class="btn-loading" style="display: none;">
+            <div class="btn-spinner"></div>
+          </div>
+        </button>
+      </div>
+
+      <form method="post" action="{{ url_for('index') }}" id="beats-form" style="display:none;">
+        {% for beat in beats %}
+          <input type="hidden" name="original_price_{{ beat.id }}" value="{{ beat.original_price or beat.price }}">
+          <input type="hidden" name="discounted_price_{{ beat.id }}" value="{{ beat.discounted_price or (beat.price if beat.is_discounted else '') }}">
+          <input type="hidden" name="is_exclusive_{{ beat.id }}" value="{{ 1 if beat.is_exclusive else 0 }}">
+          <input type="hidden" name="is_discounted_{{ beat.id }}" value="{{ 1 if beat.is_discounted else 0 }}">
+          <input type="hidden" name="discount_percent_{{ beat.id }}" value="{{ beat.discount_percent or 0 }}">
+        {% endfor %}
+      </form>
+    {% endif %}
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>
