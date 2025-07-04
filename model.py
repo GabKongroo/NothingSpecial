@@ -22,6 +22,8 @@ class Beat(Base):
     discount_percent = Column(Integer, nullable=False, default=0)
 
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
 # RIMUOVI connect_args={"check_same_thread": False} per PostgreSQL!
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
