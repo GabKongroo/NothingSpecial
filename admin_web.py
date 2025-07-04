@@ -2,9 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from model import SessionLocal, Beat
 from sqlalchemy import or_
 import os
-from dotenv import load_dotenv
-
-load_dotenv()  # Carica le variabili dal file .env
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("ADMIN_SECRET_KEY")
