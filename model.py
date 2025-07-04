@@ -1,9 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
-from dotenv import load_dotenv
-
-load_dotenv()  # Carica le variabili dal file .env
 
 Base = declarative_base()
 
