@@ -21,8 +21,6 @@ class Beat(Base):
     is_discounted = Column(Integer, nullable=False, default=0)  # 0 = False, 1 = True
     discount_percent = Column(Integer, nullable=False, default=0)
 
-# Collegamento al database reale (non tocca nulla)
-DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # RIMUOVI connect_args={"check_same_thread": False} per PostgreSQL!
 engine = create_engine(DATABASE_URL)
