@@ -283,77 +283,51 @@ def bundles():
 # Route per gestione database
 @app.route("/database_admin")
 def database_admin():
-    """Pagina amministrazione database"""
+    """Pagina amministrazione database - statistiche essenziali"""
     if not session.get("logged_in"):
         return redirect(url_for("index"))
     
     try:
         with get_session() as db:
-            # Prova a calcolare statistiche, gestendo errori se tabelle non esistono
+            # Statistiche essenziali
             try:
                 total_beats = db.query(Beat).count()
                 exclusive_beats = db.query(Beat).filter(Beat.is_exclusive == 1).count()
-                discounted_beats = db.query(Beat).filter(Beat.is_discounted == 1).count()
                 available_beats = db.query(Beat).filter(Beat.available == 1).count()
             except Exception:
-                # Se la tabella beats non esiste o ha struttura sbagliata
                 total_beats = 0
                 exclusive_beats = 0
-                discounted_beats = 0
                 available_beats = 0
             
             try:
                 total_bundles = db.query(Bundle).count()
-                active_bundles = db.query(Bundle).filter(Bundle.is_active == 1).count()
             except Exception:
-                # Se la tabella bundles non esiste o ha struttura sbagliata
                 total_bundles = 0
-                active_bundles = 0
             
             try:
-                total_orders = db.query(Order).count()
-                beat_orders = db.query(Order).filter(Order.order_type == "beat").count()
-                bundle_orders = db.query(Order).filter(Order.order_type == "bundle").count()
+                # Beat esclusivi venduti (dalla tabella orders)
+                exclusive_beats_sold = db.query(Order).filter(
+                    Order.order_type == "beat"
+                ).count()
+                
+                # Bundle venduti (dalla tabella orders)
+                bundles_sold = db.query(Order).filter(
+                    Order.order_type == "bundle"
+                ).count()
             except Exception:
-                # Se la tabella orders non esiste
-                total_orders = 0
-                beat_orders = 0
-                bundle_orders = 0
-            
-            try:
-                total_bundle_orders = db.query(BundleOrder).count()
-            except Exception:
-                # Se la tabella bundle_orders non esiste
-                total_bundle_orders = 0
-            
-            # Lista dei beat venduti (da tabella orders)
-            sold_beats = []
-            try:
-                sold_orders = db.query(Order).filter(Order.order_type == "beat").limit(10).all()
-                for order in sold_orders:
-                    sold_beats.append({
-                        "title": order.beat_title,
-                        "amount": order.amount,
-                        "created_at": order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "N/A"
-                    })
-            except Exception:
-                sold_beats = []
+                exclusive_beats_sold = 0
+                bundles_sold = 0
             
             stats = {
                 "total_beats": total_beats,
-                "total_bundles": total_bundles,
-                "discounted_beats": discounted_beats,
                 "exclusive_beats": exclusive_beats,
-                "active_bundles": active_bundles,
                 "available_beats": available_beats,
-                "total_orders": total_orders,
-                "beat_orders": beat_orders,
-                "bundle_orders": bundle_orders,
-                "total_bundle_orders": total_bundle_orders,
-                "sold_exclusive_count": beat_orders  # Approx: beat orders as sold exclusive
+                "total_bundles": total_bundles,
+                "exclusive_beats_sold": exclusive_beats_sold,
+                "bundles_sold": bundles_sold
             }
             
-            return render_template("database_admin.html", stats=stats, sold_beats=sold_beats)
+            return render_template("database_admin.html", stats=stats)
     except Exception as e:
         print(f"❌ Errore database_admin: {e}")
         return f"Errore template database_admin: {e}", 500
