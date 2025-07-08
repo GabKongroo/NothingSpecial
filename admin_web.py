@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
-from model import SessionLocal, Beat, Bundle, BundleBeat, Bundle
+from model import SessionLocal, Beat, Bundle, BundleBeat
 from sqlalchemy import or_, text
 import os
 import json
@@ -273,7 +273,11 @@ def database_admin():
     if not session.get("logged_in"):
         return redirect(url_for("index"))
     
-    return render_template("database_admin.html")
+    try:
+        return render_template("database_admin.html")
+    except Exception as e:
+        print(f"❌ Errore database_admin: {e}")
+        return f"Errore template database_admin: {e}", 500
 
 @app.route("/reset_database", methods=["POST"])
 def reset_database():
