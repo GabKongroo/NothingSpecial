@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from model import SessionLocal, Beat, Bundle, BundleBeat, Bundle
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 import os
 import json
 from pathlib import Path
+from datetime import datetime
 
 # Google Drive imports (if needed)
 try:
@@ -265,27 +266,135 @@ def bundles():
         print(f"❌ Error loading bundles: {e}")
         return render_template("bundles.html", bundles=[], error=str(e))
 
+# Route per gestione database
 @app.route("/database_admin")
 def database_admin():
-    """Amministrazione database"""
+    """Pagina amministrazione database"""
     if not session.get("logged_in"):
         return redirect(url_for("index"))
     
+    return render_template("database_admin.html")
+
+@app.route("/reset_database", methods=["POST"])
+def reset_database():
+    """Reset completo del database"""
+    if not session.get("logged_in"):
+        return jsonify({"error": "Non autorizzato"}), 401
+    
     try:
-        with SessionLocal() as db:
-            # Statistiche database
-            beats_count = db.query(Beat).count()
-            bundles_count = db.query(Bundle).count()
-            
-            stats = {
-                "beats_count": beats_count,
-                "bundles_count": bundles_count
-            }
-            
-            return render_template("database_admin.html", stats=stats)
+        db = SessionLocal()
+        
+        # Cancella tutti i record
+        db.query(BundleBeat).delete()
+        db.query(Bundle).delete()
+        db.query(Beat).delete()
+        
+        db.commit()
+        db.close()
+        
+        return jsonify({"success": True, "message": "Database resettato con successo"})
     except Exception as e:
-        print(f"❌ Error loading database admin: {e}")
-        return render_template("database_admin.html", stats={}, error=str(e))
+        print(f"❌ Errore reset database: {e}")
+        return jsonify({"error": f"Errore durante il reset: {str(e)}"}), 500
+
+@app.route("/update_database", methods=["POST"])
+def update_database():
+    """Aggiorna la struttura del database"""
+    if not session.get("logged_in"):
+        return jsonify({"error": "Non autorizzato"}), 401
+    
+    try:
+        db = SessionLocal()
+        
+        # Aggiungi colonne mancanti se non esistono
+        try:
+            # Controlla e aggiungi original_price
+            db.execute(text("ALTER TABLE beats ADD COLUMN original_price REAL"))
+            print("✅ Colonna original_price aggiunta")
+        except Exception:
+            print("ℹ️ Colonna original_price già presente")
+        
+        try:
+            # Controlla e aggiungi is_discounted
+            db.execute(text("ALTER TABLE beats ADD COLUMN is_discounted INTEGER DEFAULT 0"))
+            print("✅ Colonna is_discounted aggiunta")
+        except Exception:
+            print("ℹ️ Colonna is_discounted già presente")
+        
+        try:
+            # Controlla e aggiungi discount_percent
+            db.execute(text("ALTER TABLE beats ADD COLUMN discount_percent INTEGER DEFAULT 0"))
+            print("✅ Colonna discount_percent aggiunta")
+        except Exception:
+            print("ℹ️ Colonna discount_percent già presente")
+        
+        db.commit()
+        db.close()
+        
+        return jsonify({"success": True, "message": "Database aggiornato con successo"})
+    except Exception as e:
+        print(f"❌ Errore aggiornamento database: {e}")
+        return jsonify({"error": f"Errore durante l'aggiornamento: {str(e)}"}), 500
+
+@app.route("/export_database", methods=["GET"])
+def export_database():
+    """Esporta i dati del database in formato JSON"""
+    if not session.get("logged_in"):
+        return jsonify({"error": "Non autorizzato"}), 401
+    
+    try:
+        db = SessionLocal()
+        
+        # Esporta tutti i beat
+        beats = db.query(Beat).all()
+        beat_data = []
+        
+        for beat in beats:
+            beat_data.append({
+                "id": beat.id,
+                "title": beat.title,
+                "genre": beat.genre,
+                "mood": beat.mood,
+                "folder": beat.folder,
+                "preview_key": beat.preview_key,
+                "file_key": beat.file_key,
+                "image_key": beat.image_key,
+                "price": beat.price,
+                "original_price": beat.original_price,
+                "is_exclusive": beat.is_exclusive,
+                "is_discounted": beat.is_discounted,
+                "discount_percent": beat.discount_percent
+            })
+        
+        # Esporta tutti i bundle
+        bundles = db.query(Bundle).all()
+        bundle_data = []
+        
+        for bundle in bundles:
+            bundle_beats = db.query(BundleBeat).filter_by(bundle_id=bundle.id).all()
+            bundle_data.append({
+                "id": bundle.id,
+                "name": bundle.name,
+                "description": bundle.description,
+                "price": bundle.price,
+                "original_price": bundle.original_price,
+                "is_discounted": bundle.is_discounted,
+                "discount_percent": bundle.discount_percent,
+                "beats": [bb.beat_id for bb in bundle_beats]
+            })
+        
+        db.close()
+        
+        export_data = {
+            "beats": beat_data,
+            "bundles": bundle_data,
+            "export_date": datetime.now().isoformat()
+        }
+        
+        return jsonify(export_data)
+    except Exception as e:
+        print(f"❌ Errore esportazione database: {e}")
+        return jsonify({"error": f"Errore durante l'esportazione: {str(e)}"}), 500
 
 @app.route("/create_bundle", methods=["GET", "POST"])
 def create_bundle():
