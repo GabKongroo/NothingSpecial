@@ -2,11 +2,73 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from model import SessionLocal, Beat
 from sqlalchemy import or_
 import os
+import json
+from pathlib import Path
+
+# Google Drive imports (if needed)
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    GOOGLE_AVAILABLE = True
+except ImportError:
+    GOOGLE_AVAILABLE = False
+    print("⚠️ Google API libraries not available")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("ADMIN_SECRET_KEY")
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+
+# Google Drive Configuration
+DRIVE_ROOT_FOLDER_ID = os.environ.get("DRIVE_ROOT_FOLDER_ID")
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+
+def get_google_credentials():
+    """
+    Ottiene le credenziali Google Drive da variabile di ambiente o file locale.
+    """
+    if not GOOGLE_AVAILABLE:
+        print("❌ Google API libraries not available")
+        return None
+    
+    # Prova prima la variabile di ambiente
+    service_account_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if service_account_json and service_account_json.strip():
+        try:
+            credentials_info = json.loads(service_account_json)
+            print("✅ Credenziali Google caricate da variabile di ambiente")
+            return service_account.Credentials.from_service_account_info(
+                credentials_info, scopes=SCOPES
+            )
+        except json.JSONDecodeError as e:
+            print(f"❌ Errore parsing GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+    
+    # Fallback al file locale (solo sviluppo)
+    service_account_file = Path(__file__).parent / 'pegasus.json'
+    if service_account_file.exists():
+        print("✅ Credenziali Google caricate da file locale")
+        return service_account.Credentials.from_service_account_file(
+            service_account_file, scopes=SCOPES
+        )
+    
+    print("❌ Nessuna credenziale Google trovata")
+    return None
+
+def get_drive_service():
+    """Get authenticated Google Drive service"""
+    if not GOOGLE_AVAILABLE:
+        return None
+    
+    credentials = get_google_credentials()
+    if credentials:
+        return build('drive', 'v3', credentials=credentials)
+    return None
+
+# Health check endpoint per Railway
+@app.route("/health")
+def health_check():
+    """Endpoint per verificare lo stato dell'applicazione"""
+    return {"status": "healthy", "service": "admin-web"}, 200
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -180,5 +242,13 @@ def logout():
     session.clear()
     return redirect(url_for("index"))
 
-
-
+if __name__ == "__main__":
+    # Supporto per porta di produzione (Railway)
+    port = int(os.environ.get("PORT", 8000))
+    debug_mode = os.environ.get("FLASK_ENV", "development") == "development"
+    
+    print(f"🚀 Starting Admin Web on port {port}")
+    print(f"🔧 Debug mode: {debug_mode}")
+    print(f"🔑 Google Drive available: {GOOGLE_AVAILABLE}")
+    
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
