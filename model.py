@@ -28,8 +28,12 @@ class Bundle(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
+    description = Column(String(500), nullable=True)
     price = Column(Float, nullable=False, default=49.99)
+    original_price = Column(Float, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
+    is_discounted = Column(Integer, nullable=False, default=0)
+    discount_percent = Column(Integer, nullable=False, default=0)
     
     beats = relationship("Beat", secondary="bundle_beats", back_populates="bundles")
 
