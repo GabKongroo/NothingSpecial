@@ -274,7 +274,32 @@ def database_admin():
         return redirect(url_for("index"))
     
     try:
-        return render_template("database_admin.html")
+        with SessionLocal() as db:
+            # Calcola statistiche del database
+            total_beats = db.query(Beat).count()
+            total_bundles = db.query(Bundle).count()
+            discounted_beats = db.query(Beat).filter(Beat.is_discounted == 1).count()
+            exclusive_beats = db.query(Beat).filter(Beat.is_exclusive == 1).count()
+            
+            # Considera bundle attivi (per ora tutti i bundle)
+            active_bundles = total_bundles
+            
+            # Per ora sold_exclusive_count = 0 (non abbiamo tabella vendite)
+            sold_exclusive_count = 0
+            
+            # Lista vuota di beat venduti (non abbiamo ancora tabella vendite)
+            sold_beats = []
+            
+            stats = {
+                "total_beats": total_beats,
+                "total_bundles": total_bundles,
+                "discounted_beats": discounted_beats,
+                "exclusive_beats": exclusive_beats,
+                "active_bundles": active_bundles,
+                "sold_exclusive_count": sold_exclusive_count
+            }
+            
+            return render_template("database_admin.html", stats=stats, sold_beats=sold_beats)
     except Exception as e:
         print(f"❌ Errore database_admin: {e}")
         return f"Errore template database_admin: {e}", 500
