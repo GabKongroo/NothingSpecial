@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session
-from model import SessionLocal, Beat
+from model import SessionLocal, Beat, Bundle, BundleBeat, Bundle
 from sqlalchemy import or_
 import os
 import json
@@ -68,7 +68,15 @@ def get_drive_service():
 @app.route("/health")
 def health_check():
     """Endpoint per verificare lo stato dell'applicazione"""
-    return {"status": "healthy", "service": "admin-web"}, 200
+    try:
+        # Test connessione database
+        with SessionLocal() as db:
+            db.execute("SELECT 1")
+        
+        return {"status": "healthy", "service": "admin-web", "database": "ok"}, 200
+    except Exception as e:
+        print(f"❌ Health check failed: {e}")
+        return {"status": "unhealthy", "service": "admin-web", "error": str(e)}, 503
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -241,6 +249,102 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("index"))
+
+
+@app.route("/bundles")
+def bundles():
+    """Gestione bundles"""
+    if not session.get("logged_in"):
+        return redirect(url_for("index"))
+    
+    try:
+        with SessionLocal() as db:
+            bundles = db.query(Bundle).all()
+            return render_template("bundles.html", bundles=bundles)
+    except Exception as e:
+        print(f"❌ Error loading bundles: {e}")
+        return render_template("bundles.html", bundles=[], error=str(e))
+
+@app.route("/database_admin")
+def database_admin():
+    """Amministrazione database"""
+    if not session.get("logged_in"):
+        return redirect(url_for("index"))
+    
+    try:
+        with SessionLocal() as db:
+            # Statistiche database
+            beats_count = db.query(Beat).count()
+            bundles_count = db.query(Bundle).count()
+            
+            stats = {
+                "beats_count": beats_count,
+                "bundles_count": bundles_count
+            }
+            
+            return render_template("database_admin.html", stats=stats)
+    except Exception as e:
+        print(f"❌ Error loading database admin: {e}")
+        return render_template("database_admin.html", stats={}, error=str(e))
+
+@app.route("/create_bundle", methods=["GET", "POST"])
+def create_bundle():
+    """Creazione bundle"""
+    if not session.get("logged_in"):
+        return redirect(url_for("index"))
+    
+    if request.method == "POST":
+        try:
+            with SessionLocal() as db:
+                # Logica per creare bundle
+                bundle_name = request.form.get("bundle_name")
+                selected_beats = request.form.getlist("selected_beats")
+                
+                # Crea bundle nel database
+                new_bundle = Bundle(
+                    name=bundle_name,
+                    price=float(request.form.get("bundle_price", 0))
+                )
+                db.add(new_bundle)
+                db.commit()
+                
+                return redirect(url_for("bundles"))
+        except Exception as e:
+            print(f"❌ Error creating bundle: {e}")
+            return render_template("create_bundle.html", error=str(e))
+    
+    try:
+        with SessionLocal() as db:
+            beats = db.query(Beat).all()
+            return render_template("create_bundle.html", beats=beats)
+    except Exception as e:
+        return render_template("create_bundle.html", beats=[], error=str(e))
+
+@app.route("/edit_bundle/<int:bundle_id>", methods=["GET", "POST"])
+def edit_bundle(bundle_id):
+    """Modifica bundle"""
+    if not session.get("logged_in"):
+        return redirect(url_for("index"))
+    
+    if request.method == "POST":
+        try:
+            with SessionLocal() as db:
+                bundle = db.query(Bundle).filter(Bundle.id == bundle_id).first()
+                if bundle:
+                    bundle.name = request.form.get("bundle_name")
+                    bundle.price = float(request.form.get("bundle_price", 0))
+                    db.commit()
+                    return redirect(url_for("bundles"))
+        except Exception as e:
+            print(f"❌ Error editing bundle: {e}")
+    
+    try:
+        with SessionLocal() as db:
+            bundle = db.query(Bundle).filter(Bundle.id == bundle_id).first()
+            beats = db.query(Beat).all()
+            return render_template("edit_bundle.html", bundle=bundle, beats=beats)
+    except Exception as e:
+        return render_template("edit_bundle.html", bundle=None, beats=[], error=str(e))
 
 if __name__ == "__main__":
     # Supporto per porta di produzione (Railway)
