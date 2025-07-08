@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import Column, Integer, String, Float, Boolean, create_engine, ForeignKey
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 import os
 
 Base = declarative_base()
@@ -21,6 +21,24 @@ class Beat(Base):
     is_discounted = Column(Integer, nullable=False, default=0)  # 0 = False, 1 = True
     discount_percent = Column(Integer, nullable=False, default=0)
 
+    bundles = relationship("Bundle", secondary="bundle_beats", back_populates="beats")
+
+class Bundle(Base):
+    __tablename__ = "bundles"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    price = Column(Float, nullable=False, default=49.99)
+    is_active = Column(Boolean, nullable=False, default=True)
+    
+    beats = relationship("Beat", secondary="bundle_beats", back_populates="bundles")
+
+class BundleBeat(Base):
+    __tablename__ = "bundle_beats"
+
+    id = Column(Integer, primary_key=True)
+    bundle_id = Column(Integer, ForeignKey("bundles.id"), nullable=False)
+    beat_id = Column(Integer, ForeignKey("beats.id"), nullable=False)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
