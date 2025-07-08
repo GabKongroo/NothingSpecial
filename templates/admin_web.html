@@ -2,17 +2,129 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Gestione Beat - Admin</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="format-detection" content="telephone=no" />
+  <!-- Fix specifici per iOS scroll -->
+  <meta name="apple-touch-fullscreen" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <link rel="apple-touch-icon" href="/static/icon.png" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  
+  <!-- Fix inline per problemi scroll mobile -->
+  <style>
+    /* Fix immediato per scroll mobile */
+    html {
+      -webkit-overflow-scrolling: touch !important;
+      overflow-scrolling: touch !important;
+      scroll-behavior: smooth !important;
+      overscroll-behavior: contain !important;
+    }
+    
+    body {
+      -webkit-overflow-scrolling: touch !important;
+      overflow-scrolling: touch !important;
+      position: relative !important;
+    }
+    
+    /* Previeni interferenze con scroll */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Fix per contenitori che possono bloccare scroll */
+    .center-container {
+      overflow: visible !important;
+      height: auto !important;
+    }
+    
+    /* Assicura che i controlli mobile non interferiscano */
+    .mobile-controls {
+      pointer-events: auto;
+      touch-action: none;
+      position: fixed;
+      z-index: 9999;
+      bottom: 20px;
+      right: 20px;
+      display: none; /* Nascosto su desktop */
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .mobile-controls * {
+      touch-action: manipulation;
+    }
+    
+    .mobile-control-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, #007aff, #5856d6);
+      color: white;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .mobile-control-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+    }
+    
+    .mobile-control-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .mobile-control-btn.mobile-save-all {
+      background: linear-gradient(135deg, #28a745, #20c997);
+      box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    }
+    
+    .mobile-control-btn.mobile-save-all:hover {
+      box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    }
+    
+    .control-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+    
+    /* Mostra controlli mobili solo su schermi piccoli */
+    @media (max-width: 768px) {
+      .mobile-controls {
+        display: flex;
+      }
+      
+      /* Nasconde il bottone desktop su mobile */
+      .save-all-container {
+        display: none;
+      }
+    }
+    
+    /* Fix per iOS Safari */
+    @supports (-webkit-touch-callout: none) {
+      body {
+        -webkit-transform: translate3d(0,0,0);
+        transform: translate3d(0,0,0);
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
+
+  <!-- Modal Container -->
+  <div id="modal-container"></div>
 
   <!-- Loading Overlay -->
   <div id="loading-overlay" class="loading-overlay" style="display: none;">
@@ -39,8 +151,24 @@
     </div>
   </div>
 
-  <div class="center-container">
+  <div class="center-container" style="margin-top: 40px;">
     {% if session.get('logged_in') %}
+      <!-- Navigazione Tab -->
+      <nav class="nav-tabs" style="margin-bottom: 40px;">
+        <a href="{{ url_for('index') }}" class="nav-tab active">
+          <span class="nav-tab-icon">🎵</span>
+          <span class="nav-tab-text">Beat</span>
+        </a>
+        <a href="{{ url_for('bundles') }}" class="nav-tab">
+          <span class="nav-tab-icon">📦</span>
+          <span class="nav-tab-text">Bundle</span>
+        </a>
+        <a href="{{ url_for('database_admin') }}" class="nav-tab">
+          <span class="nav-tab-icon">🗄️</span>
+          <span class="nav-tab-text">Database</span>
+        </a>
+      </nav>
+
       <!-- Barra di ricerca -->
       <form method="get" action="{{ url_for('index') }}" class="search-bar" style="margin-bottom: 32px; display: flex; justify-content: center;">
         <input
@@ -84,6 +212,7 @@
 
         {% for beat in beats %}
         <form method="post" action="{{ url_for('index') }}" class="beat-form">
+          <input type="hidden" name="beat_id" value="{{ beat.id }}" />
           <div class="beat-card" id="beat-card-{{ beat.id }}" data-beat-id="{{ beat.id }}">
             <div class="beat-header">
               <div class="beat-info">
@@ -181,6 +310,7 @@
         {% endfor %}
       </div>
 
+      <!-- Desktop Save All Button -->
       <div class="save-all-container">
         <button type="button" id="save-all-btn" class="save-all-btn">
           <span class="btn-icon">✅</span>
@@ -203,6 +333,72 @@
     {% endif %}
   </div>
 
+  <!-- Mobile Control Buttons -->
+  <div class="mobile-controls">
+    <!-- Scroll to Top Button -->
+    <button type="button" id="scroll-top-btn" class="mobile-control-btn" title="Vai in alto">
+      <span class="control-icon">⬆️</span>
+    </button>
+    
+    <!-- Scroll to Bottom Button -->
+    <button type="button" id="scroll-bottom-btn" class="mobile-control-btn" title="Vai in basso">
+      <span class="control-icon">⬇️</span>
+    </button>
+    
+    <!-- Mobile Save All Button -->
+    <button type="button" id="mobile-save-all-btn" class="mobile-control-btn mobile-save-all" title="Salva tutti i cambiamenti">
+      <span class="control-icon">💾</span>
+    </button>
+  </div>
+
   <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  <script>
+    // Debug per verificare che tutto sia collegato
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('🔧 Admin interface caricata');
+      
+      const saveAllBtn = document.getElementById('save-all-btn');
+      if (saveAllBtn) {
+        console.log('✅ Bottone "Salva tutti" trovato');
+      } else {
+        console.error('❌ Bottone "Salva tutti" NON trovato');
+      }
+      
+      // Test raccolta dati
+      const beatCards = document.querySelectorAll('.beat-card');
+      console.log(`📊 Trovate ${beatCards.length} beat cards`);
+      
+      // Mobile Controls Setup
+      const scrollTopBtn = document.getElementById('scroll-top-btn');
+      const scrollBottomBtn = document.getElementById('scroll-bottom-btn');
+      const mobileSaveAllBtn = document.getElementById('mobile-save-all-btn');
+      
+      // Scroll to top
+      if (scrollTopBtn) {
+        scrollTopBtn.addEventListener('click', function() {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      }
+      
+      // Scroll to bottom
+      if (scrollBottomBtn) {
+        scrollBottomBtn.addEventListener('click', function() {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        });
+      }
+      
+      // Mobile save all button
+      if (mobileSaveAllBtn) {
+        mobileSaveAllBtn.addEventListener('click', function() {
+          console.log('🔄 Mobile Save All button clicked');
+          if (window.beatManager && typeof window.beatManager.saveAllBeats === 'function') {
+            window.beatManager.saveAllBeats();
+          } else {
+            console.error('❌ beatManager.saveAllBeats is not available');
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>

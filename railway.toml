@@ -1,0 +1,11 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "always"
+
+[env]
+PORT = "8000"
+ENVIRONMENT = "production"

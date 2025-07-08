@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Gestione Bundle - Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <style>
+    @media (max-width: 768px) {
+      .center-container {
+        max-width: 100% !important;
+        padding: 0 12px !important;
+        margin-top: 20px !important;
+      }
+      .bundle-list {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+      }
+      .bundle-card {
+        max-width: none !important;
+        padding: 20px !important;
+      }
+      .tab-navigation {
+        flex-direction: column !important;
+        gap: 12px !important;
+        margin-bottom: 32px !important;
+      }
+      .tab-btn {
+        margin: 0 !important;
+        padding: 12px 24px !important;
+        min-width: auto !important;
+      }
+      .search-container {
+        max-width: 100% !important;
+        margin: 0 12px !important;
+      }
+      #bundle-search {
+        font-size: 16px !important;
+        padding: 14px 45px 14px 16px !important;
+      }
+    }
+    
+    @media (min-width: 1200px) {
+      .bundle-list {
+        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)) !important;
+      }
+    }
+    
+    @media (min-width: 1600px) {
+      .bundle-list {
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)) !important;
+      }
+    }
+    
+    /* Stili per la barra di ricerca */
+    #bundle-search:focus {
+      outline: none;
+      border-color: #007aff;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+    }
+    
+    .search-container:focus-within .search-icon {
+      color: #007aff;
+    }
+    
+    /* Animazioni per i bundle filtrati */
+    .bundle-card {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    
+    .bundle-card.hidden {
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+  <div id="modal-container"></div>
+
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <div class="logo-section">
+        <div class="logo-icon">🎁</div>
+        <h2>Gestione Bundle</h2>
+      </div>
+      {% if session.get('logged_in') %}
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+          <button type="submit" class="logout-btn">
+            <span class="logout-icon">🚪</span>
+            <span class="logout-text">Logout</span>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="center-container" style="max-width: 95%; width: 100%; margin: 0 auto; padding: 0 20px; margin-top: 40px;">
+    {% if session.get('logged_in') %}
+      <!-- Navigazione Tab -->
+      <nav class="nav-tabs" style="margin-bottom: 48px;">
+        <a href="{{ url_for('index') }}" class="nav-tab">
+          <span class="nav-tab-icon">🎵</span>
+          <span class="nav-tab-text">Beat</span>
+        </a>
+        <a href="{{ url_for('bundles') }}" class="nav-tab active">
+          <span class="nav-tab-icon">📦</span>
+          <span class="nav-tab-text">Bundle</span>
+        </a>
+        <a href="{{ url_for('database_admin') }}" class="nav-tab">
+          <span class="nav-tab-icon">🗄️</span>
+          <span class="nav-tab-text">Database</span>
+        </a>
+      </nav>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages">
+            {% for category, message in messages %}
+              <div class="flash-message flash-{{ category }}">
+                <span class="flash-icon">
+                  {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}ℹ️{% endif %}
+                </span>
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <!-- Barra di ricerca -->
+      <div style="display: flex; justify-content: center; margin-bottom: 32px;">
+        <div class="search-container" style="position: relative; max-width: 600px; width: 100%;">
+          <input type="text" id="bundle-search" placeholder="Cerca bundle per nome, descrizione o beat..." style="width: 100%; padding: 16px 50px 16px 20px; border: 2px solid #e5e5e7; border-radius: 20px; font-size: 16px; background: #f8f9fa; transition: all 0.3s; box-sizing: border-box;" />
+          <div style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; color: #6c757d; pointer-events: none;">🔍</div>
+        </div>
+      </div>
+
+      <!-- Pulsante Crea Bundle -->
+      <div style="text-align: center; margin-bottom: 40px;">
+        <a href="{{ url_for('create_bundle') }}" class="create-bundle-btn" style="display: inline-flex; align-items: center; gap: 12px; padding: 16px 32px; background: linear-gradient(135deg, #34c759, #32d74b); color: white; text-decoration: none; border-radius: 16px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 20px rgba(52, 199, 89, 0.3); transition: all 0.2s;">
+          <span style="font-size: 18px;">➕</span>
+          <span>Crea Nuovo Bundle</span>
+        </a>
+      </div>
+
+      <!-- Lista Bundle -->
+      {% if bundles %}
+        <div class="bundle-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; width: 100%;">
+          {% for bundle in bundles %}
+            <div class="bundle-card" style="background: white; border-radius: 20px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid #f0f0f0; transition: all 0.3s; min-height: 400px; max-width: 600px; width: 100%;">
+              <div class="bundle-header" style="margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                  {% if bundle.image_key %}
+                    <img src="https://beats-cdn.pegasus-beats.workers.dev/{{ bundle.image_key }}" 
+                         alt="{{ bundle.name }}" 
+                         style="width: 80px; height: 80px; border-radius: 16px; object-fit: cover; border: 2px solid #e5e5e7; flex-shrink: 0;"
+                         onerror="this.style.display='none'">
+                  {% else %}
+                    <div style="width: 80px; height: 80px; border-radius: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; flex-shrink: 0;">
+                      🎁
+                    </div>
+                  {% endif %}
+                  <div class="bundle-info" style="flex: 1; min-width: 0;">
+                    <h3 class="bundle-title" style="font-size: 20px; font-weight: 700; color: #1d1d1f; margin: 0 0 8px 0; line-height: 1.3;">{{ bundle.name }}</h3>
+                    {% if bundle.description %}
+                      <p class="bundle-description" style="color: #6c757d; margin: 0 0 12px 0; font-size: 14px; line-height: 1.4;">{{ bundle.description }}</p>
+                    {% endif %}
+                    <div class="bundle-status" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #8e8e93;">
+                      {% if bundle.is_active %}
+                        <span class="status-active" style="color: #34c759; font-weight: 600;">🟢 Attivo</span>
+                      {% else %}
+                        <span class="status-inactive" style="color: #ff3b30; font-weight: 600;">🔴 Disattivato</span>
+                      {% endif %}
+                      <span>•</span>
+                      <span>{{ bundle.beats_count }} beat{% if bundle.beats_count != 1 %}s{% endif %}</span>
+                      <span>•</span>
+                      <span>Creato: {{ bundle.created_at.strftime('%d/%m/%Y') if bundle.created_at else 'N/A' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Prezzi -->
+              <div class="bundle-pricing" style="background: #f8f9fa; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <div class="pricing-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px;">
+                  <span style="color: #6c757d;">Prezzo singoli beat:</span>
+                  <span style="font-weight: 600; color: #1d1d1f;">{{ "€%.2f"|format(bundle.individual_price) }}</span>
+                </div>
+                <div class="pricing-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px;">
+                  <span style="color: #6c757d;">Prezzo bundle:</span>
+                  <span style="font-weight: 600; color: #1d1d1f;">{{ "€%.2f"|format(bundle.bundle_price) }}</span>
+                </div>
+                <div class="pricing-row" style="display: flex; justify-content: space-between; align-items: center; color: #34c759; font-size: 14px;">
+                  <span><strong>Sconto:</strong></span>
+                  <span><strong>{{ bundle.discount_percent }}% ({{ "€%.2f"|format(bundle.individual_price - bundle.bundle_price) }} risparmiati)</strong></span>
+                </div>
+              </div>
+
+              <!-- Beat nel Bundle -->
+              <div class="bundle-beats-section" style="margin-bottom: 24px;">
+                <div class="bundle-beats-title" style="font-weight: 600; color: #1d1d1f; margin-bottom: 12px; font-size: 16px;">🎵 Beat inclusi:</div>
+                <div class="bundle-beats-list" style="max-height: 120px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; padding: 12px;">
+                  {% for beat in bundle.beats %}
+                    <div class="bundle-beat-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e9ecef;">
+                      <div class="bundle-beat-name" style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; color: #1d1d1f; font-size: 14px; margin-bottom: 2px;">
+                          {{ beat.title }}
+                          {% if beat.price == 0 %}
+                            <span style="color: #ff3b30; font-weight: bold; font-size: 12px;">🔒 ESCLUSIVO</span>
+                          {% endif %}
+                        </div>
+                        <div class="bundle-beat-meta" style="color: #6c757d; font-size: 12px;">
+                          ID: {{ beat.id }} • Prezzo: €{{ "%.2f"|format(beat.price) }}
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <!-- Azioni Bundle -->
+              <div class="bundle-actions" style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                <a href="{{ url_for('edit_bundle', bundle_id=bundle.id) }}" class="bundle-btn btn-edit" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: #007aff; color: white; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 14px; transition: all 0.2s; flex: 1; justify-content: center; min-width: 120px;">
+                  <span>✏️</span>
+                  <span>Modifica</span>
+                </a>
+                
+                <form method="post" action="{{ url_for('toggle_bundle', bundle_id=bundle.id) }}" style="display: inline; flex: 1;">
+                  <button type="submit" class="bundle-btn btn-toggle" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: {% if bundle.is_active %}#ff9500{% else %}#34c759{% endif %}; color: white; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; width: 100%; justify-content: center; min-width: 120px;">
+                    {% if bundle.is_active %}
+                      <span>⏸️</span>
+                      <span>Disattiva</span>
+                    {% else %}
+                      <span>▶️</span>
+                      <span>Attiva</span>
+                    {% endif %}
+                  </button>
+                </form>
+                
+                <form method="post" action="{{ url_for('delete_bundle', bundle_id=bundle.id) }}" 
+                      onsubmit="return handleDeleteBundle(event)" 
+                      style="display: inline; flex: 1;">
+                  <button type="submit" class="bundle-btn btn-delete" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: #ff3b30; color: white; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; width: 100%; justify-content: center; min-width: 120px;">
+                    <span>🗑️</span>
+                    <span>Elimina</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state" style="text-align: center; padding: 60px 20px; max-width: 500px; margin: 0 auto;">
+          <div class="empty-icon" style="font-size: 80px; margin-bottom: 20px;">📦</div>
+          <h3 style="font-size: 24px; font-weight: 700; color: #1d1d1f; margin-bottom: 12px;">Nessun bundle creato</h3>
+          <p style="color: #1d1d1f; font-size: 16px; margin-bottom: 32px;">Inizia creando il tuo primo bundle promozionale!</p>
+          <a href="{{ url_for('create_bundle') }}" class="create-bundle-btn" style="display: inline-flex; align-items: center; gap: 12px; padding: 16px 32px; background: linear-gradient(135deg, #34c759, #32d74b); color: white; text-decoration: none; border-radius: 16px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 20px rgba(52, 199, 89, 0.3);">
+            <span style="font-size: 18px;">➕</span>
+            <span>Crea Primo Bundle</span>
+          </a>
+        </div>
+      {% endif %}
+    {% else %}
+      <!-- Login Required -->
+      <div class="login-container">
+        <div class="login-card">
+          <div class="login-header">
+            <div class="login-icon">🔐</div>
+            <h3>Accesso Richiesto</h3>
+            <p>Devi effettuare il login per gestire i bundle</p>
+          </div>
+          <a href="{{ url_for('index') }}" style="color: #007aff; text-decoration: none; font-weight: 600;">
+            ← Torna alla pagina di login
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  <script>
+    // Auto-hide flash messages after 5 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+      const flashMessages = document.querySelectorAll('.flash-message');
+      flashMessages.forEach(function(message) {
+        setTimeout(function() {
+          message.style.opacity = '0';
+          setTimeout(function() {
+            message.remove();
+          }, 300);
+        }, 5000);
+      });
+
+      // Handle delete bundle confirmation with custom modal
+      async function handleDeleteBundle(event) {
+        event.preventDefault();
+        
+        const confirmed = await modalManager.confirm(
+          'Elimina Bundle',
+          'Sei sicuro di voler eliminare questo bundle? Questa azione non può essere annullata.',
+          { 
+            confirmText: 'Sì, Elimina',
+            cancelText: 'Annulla' 
+          }
+        );
+        
+        if (confirmed) {
+          event.target.submit();
+        }
+        
+        return false;
+      }
+
+      // Inizializza la ricerca bundle
+      initBundleSearch();
+    });
+
+    function initBundleSearch() {
+      const searchInput = document.getElementById('bundle-search');
+      const bundleCards = document.querySelectorAll('.bundle-card');
+      
+      if (!searchInput || bundleCards.length === 0) return;
+
+      // Aggiungi evento di input con debounce
+      let searchTimeout;
+      searchInput.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          performSearch(e.target.value.toLowerCase().trim());
+        }, 300); // Debounce di 300ms
+      });
+
+      // Effettua focus sulla barra di ricerca con Ctrl+F
+      document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+          e.preventDefault();
+          searchInput.focus();
+        }
+      });
+    }
+
+    function performSearch(searchTerm) {
+      const bundleCards = document.querySelectorAll('.bundle-card');
+      let visibleCount = 0;
+
+      bundleCards.forEach(function(card) {
+        const shouldShow = searchTerm === '' || matchesSearch(card, searchTerm);
+        
+        if (shouldShow) {
+          card.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      // Mostra/nascondi messaggio "nessun risultato"
+      updateNoResultsMessage(visibleCount, searchTerm);
+    }
+
+    function matchesSearch(card, searchTerm) {
+      // Ottieni il testo del nome del bundle
+      const nameElement = card.querySelector('.bundle-title');
+      const name = nameElement ? nameElement.textContent.toLowerCase() : '';
+      
+      // Ottieni il testo della descrizione
+      const descElement = card.querySelector('.bundle-description');
+      const description = descElement ? descElement.textContent.toLowerCase() : '';
+      
+      // Ottieni i nomi dei beat
+      const beatElements = card.querySelectorAll('.bundle-beat-name');
+      const beatNames = Array.from(beatElements).map(el => el.textContent.toLowerCase()).join(' ');
+      
+      // Verifica se il termine di ricerca è presente in uno dei campi
+      return name.includes(searchTerm) || 
+             description.includes(searchTerm) || 
+             beatNames.includes(searchTerm);
+    }
+
+    function updateNoResultsMessage(visibleCount, searchTerm) {
+      const bundleList = document.querySelector('.bundle-list');
+      let noResultsMsg = document.getElementById('no-results-message');
+      
+      if (visibleCount === 0 && searchTerm !== '') {
+        if (!noResultsMsg) {
+          noResultsMsg = document.createElement('div');
+          noResultsMsg.id = 'no-results-message';
+          noResultsMsg.style.cssText = `
+            text-align: center;
+            padding: 60px 20px;
+            max-width: 500px;
+            margin: 0 auto;
+            grid-column: 1 / -1;
+          `;
+          noResultsMsg.innerHTML = `
+            <div style="font-size: 60px; margin-bottom: 20px;">🔍</div>
+            <h3 style="font-size: 24px; font-weight: 700; color: #1d1d1f; margin-bottom: 12px;">Nessun bundle trovato</h3>
+            <p style="color: #6c757d; font-size: 16px; margin-bottom: 32px;">Nessun bundle corrisponde ai criteri di ricerca "<strong>${searchTerm}</strong>"</p>
+            <button onclick="clearSearch()" style="padding: 12px 24px; background: #007aff; color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer;">
+              Cancella ricerca
+            </button>
+          `;
+          bundleList.appendChild(noResultsMsg);
+        } else {
+          noResultsMsg.querySelector('p').innerHTML = `Nessun bundle corrisponde ai criteri di ricerca "<strong>${searchTerm}</strong>"`;
+        }
+      } else if (noResultsMsg) {
+        noResultsMsg.remove();
+      }
+    }
+
+    function clearSearch() {
+      const searchInput = document.getElementById('bundle-search');
+      searchInput.value = '';
+      performSearch('');
+      searchInput.focus();
+    }
+  </script>
+</body>
+</html>

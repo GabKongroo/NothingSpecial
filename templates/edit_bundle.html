@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Modifica Bundle - Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+  <div id="modal-container"></div>
+
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <div class="logo-section">
+        <div class="logo-icon">🎁</div>
+        <h2>Modifica Bundle</h2>
+      </div>
+      {% if session.get('logged_in') %}
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+          <button type="submit" class="logout-btn">
+            <span class="logout-icon">🚪</span>
+            <span class="logout-text">Logout</span>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="center-container">
+    {% if session.get('logged_in') %}
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages">
+            {% for category, message in messages %}
+              <div class="flash-message flash-{{ category }}">
+                <span class="flash-icon">
+                  {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}ℹ️{% endif %}
+                </span>
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <!-- Breadcrumb -->
+      <div style="margin-bottom: 24px;">
+        <a href="{{ url_for('bundles') }}" style="color: #007aff; text-decoration: none; font-weight: 600;">
+          ← Torna ai Bundle
+        </a>
+      </div>
+
+      <!-- Form di modifica bundle -->
+      <form method="post" class="bundle-form">
+        <div class="bundle-card">
+          <h3 style="margin-bottom: 24px; color: #1d1d1f;">📝 Modifica Bundle</h3>
+          
+          <!-- Nome Bundle -->
+          <div class="beat-field" style="margin-bottom: 20px;">
+            <label class="beat-label">Nome Bundle <span style="color: #ff3b30;">*</span></label>
+            <input type="text" name="name" required 
+                   value="{{ bundle.name }}"
+                   style="width: 100%; padding: 12px; border: 2px solid #e5e5e7; border-radius: 8px; font-size: 16px;" />
+          </div>
+
+          <!-- Descrizione Bundle -->
+          <div class="beat-field" style="margin-bottom: 20px;">
+            <label class="beat-label">Descrizione</label>
+            <textarea name="description" rows="3" 
+                      style="width: 100%; padding: 12px; border: 2px solid #e5e5e7; border-radius: 8px; font-size: 16px; resize: vertical;">{{ bundle.description or '' }}</textarea>
+          </div>
+
+          <!-- Prezzo Bundle -->
+          <div class="beat-field" style="margin-bottom: 32px;">
+            <label class="beat-label">Prezzo Bundle (€) <span style="color: #ff3b30;">*</span></label>
+            <input type="number" name="bundle_price" id="bundle_price" step="0.01" min="0.01" required 
+                   value="{{ bundle.bundle_price }}"
+                   style="width: 100%; padding: 12px; border: 2px solid #e5e5e7; border-radius: 8px; font-size: 16px;" />
+          </div>
+
+          <!-- Upload Immagine Bundle -->
+          <div class="beat-field" style="margin-bottom: 32px;">
+            <label class="beat-label">Immagine Bundle</label>
+            <div id="image-upload-area" style="border: 2px dashed #e5e5e7; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s;">
+              {% if bundle.image_key %}
+                <img src="https://beats-cdn.pegasus-beats.workers.dev/{{ bundle.image_key }}" style="max-width: 100%; max-height: 200px; border-radius: 8px;" />
+                <p style="color: #34c759; margin-top: 16px;">✅ Immagine attuale</p>
+                <p style="color: #666; font-size: 14px;">Clicca per sostituire</p>
+              {% else %}
+                <div style="font-size: 48px; margin-bottom: 16px;">📸</div>
+                <p style="color: #666; margin-bottom: 8px;">Clicca per caricare un'immagine</p>
+                <p style="color: #999; font-size: 14px;">o trascina qui il file (max 5MB)</p>
+              {% endif %}
+              <div class="upload-progress" style="width: 0%; height: 4px; background: #007aff; margin-top: 16px; border-radius: 2px; display: none;"></div>
+            </div>
+            <input type="file" id="bundle-image-input" accept="image/*" style="display: none;" />
+            <input type="hidden" name="image_key" value="{{ bundle.image_key or '' }}" />
+          </div>
+
+          <!-- Selezione Beat -->
+          <div class="beat-field">
+            <label class="beat-label">Seleziona Beat ({{ beats|length }} disponibili) <span style="color: #ff3b30;">*</span></label>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e5e5e7; border-radius: 12px; padding: 8px; background: #f8f9fa;">
+              {% for beat in beats %}
+              <div class="beat-selection-item" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; margin-bottom: 8px; background: white; border-radius: 8px; border: 1px solid #e5e5e7;">
+                <div class="beat-info-section" style="flex: 1;">
+                  <div class="beat-name" style="font-weight: 600; color: #1d1d1f; margin-bottom: 4px;">{{ beat.title }}</div>
+                  <div class="beat-meta" style="font-size: 14px; color: #6c757d; margin-bottom: 8px;">{{ beat.genre }} - {{ beat.mood }} - €{{ "%.2f"|format(beat.price) }}</div>
+                  <div class="beat-badges-inline" style="display: flex; gap: 8px;">
+                    {% if beat.get('is_discounted') %}
+                    <span class="badge-mini" style="background: rgba(255, 204, 0, 0.1); color: #ffcc00; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;">💸 Scontato</span>
+                    {% endif %}
+                    {% if beat.get('is_exclusive') %}
+                    <span class="badge-mini" style="background: rgba(255, 59, 48, 0.1); color: #ff3b30; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;">🔒 Esclusivo</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="beat-checkbox-section">
+                  <input type="checkbox" name="beat_ids" value="{{ beat.id }}" id="beat-{{ beat.id }}" 
+                         data-price="{{ beat.price }}"
+                         {% if beat.selected %}checked{% endif %}
+                         style="width: 20px; height: 20px; cursor: pointer;" />
+                  <label for="beat-{{ beat.id }}" style="margin-left: 8px; cursor: pointer; display: none;"></label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Riepilogo Prezzi -->
+          <div class="price-summary" id="price-summary" style="margin-top: 32px; padding: 20px; background: #f8f9fa; border-radius: 12px; display: none;">
+            <h3 style="margin: 0 0 16px 0; color: #1976d2;">💰 Riepilogo Prezzi</h3>
+            <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>Beat selezionati:</span>
+              <span id="selected-count">0</span>
+            </div>
+            <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>Prezzo individuale totale:</span>
+              <span id="individual-total">€0.00</span>
+            </div>
+            <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>Prezzo bundle:</span>
+              <span id="bundle-total">€0.00</span>
+            </div>
+            <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>Sconto:</span>
+              <span id="discount-amount">€0.00</span>
+            </div>
+            <div class="summary-row" style="display: flex; justify-content: space-between; font-weight: bold; color: #34c759;">
+              <span>Percentuale sconto:</span>
+              <span id="discount-percent">0%</span>
+            </div>
+          </div>
+
+          <!-- Azioni -->
+          <div class="form-actions" style="display: flex; gap: 16px; justify-content: center; margin-top: 32px;">
+            <button type="submit" class="save-all-btn" style="background: linear-gradient(135deg, #007aff, #5856d6); color: white; border: none; padding: 16px 32px; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;">
+              <span>💾</span>
+              <span>Salva Modifiche</span>
+            </button>
+            <a href="{{ url_for('bundles') }}" class="save-single-btn" style="background: #8e8e93; color: white; border: none; padding: 16px 32px; border-radius: 12px; font-size: 16px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+              <span>❌</span>
+              <span>Annulla</span>
+            </a>
+          </div>
+        </div>
+      </form>
+    {% else %}
+      <!-- Login Required -->
+      <div class="login-container">
+        <div class="login-card">
+          <div class="login-header">
+            <div class="login-icon">🔐</div>
+            <h3>Accesso Richiesto</h3>
+            <p>Devi effettuare il login per modificare bundle</p>
+          </div>
+          <a href="{{ url_for('index') }}" style="color: #007aff; text-decoration: none; font-weight: 600;">
+            ← Torna alla pagina di login
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Price summary functionality
+      const checkboxes = document.querySelectorAll('input[name="beat_ids"]');
+      const bundlePriceInput = document.getElementById('bundle_price');
+      const priceSummary = document.getElementById('price-summary');
+      
+      function updatePriceSummary() {
+        const selectedBeats = Array.from(checkboxes).filter(cb => cb.checked);
+        const individualTotal = selectedBeats.reduce((sum, cb) => sum + parseFloat(cb.dataset.price || 0), 0);
+        const bundlePrice = parseFloat(bundlePriceInput.value) || 0;
+        const discountAmount = individualTotal - bundlePrice;
+        const discountPercent = individualTotal > 0 ? Math.round((discountAmount / individualTotal) * 100) : 0;
+        
+        document.getElementById('selected-count').textContent = selectedBeats.length;
+        document.getElementById('individual-total').textContent = `€${individualTotal.toFixed(2)}`;
+        document.getElementById('bundle-total').textContent = `€${bundlePrice.toFixed(2)}`;
+        document.getElementById('discount-amount').textContent = `€${discountAmount.toFixed(2)}`;
+        document.getElementById('discount-percent').textContent = `${discountPercent}%`;
+        
+        // Show/hide summary
+        priceSummary.style.display = selectedBeats.length > 0 ? 'block' : 'none';
+      }
+      
+      // Event listeners
+      checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updatePriceSummary);
+      });
+      
+      bundlePriceInput.addEventListener('input', updatePriceSummary);
+      
+      // Initialize summary
+      updatePriceSummary();
+
+      // Image upload functionality
+      const uploadArea = document.getElementById('image-upload-area');
+      const fileInput = document.getElementById('bundle-image-input');
+      const imageKeyInput = document.querySelector('input[name="image_key"]');
+
+      if (uploadArea && fileInput && imageKeyInput) {
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          uploadArea.style.borderColor = '#007aff';
+          uploadArea.style.backgroundColor = 'rgba(0, 122, 255, 0.05)';
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+          uploadArea.style.borderColor = '#e5e5e7';
+          uploadArea.style.backgroundColor = 'transparent';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+          e.preventDefault();
+          uploadArea.style.borderColor = '#e5e5e7';
+          uploadArea.style.backgroundColor = 'transparent';
+          
+          const files = e.dataTransfer.files;
+          if (files.length > 0) {
+            handleFileUpload(files[0]);
+          }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files.length > 0) {
+            handleFileUpload(e.target.files[0]);
+          }
+        });
+
+        async function handleFileUpload(file) {
+          if (!file.type.startsWith('image/')) {
+            await showError('Per favore seleziona un file immagine valido', 'Formato File Non Valido');
+            return;
+          }
+
+          if (file.size > 5 * 1024 * 1024) {
+            await showError('Il file è troppo grande. Massimo 5MB consentiti.', 'File Troppo Grande');
+            return;
+          }
+
+          const progressBar = uploadArea.querySelector('.upload-progress');
+          progressBar.style.display = 'block';
+          progressBar.style.width = '0%';
+
+          try {
+            const formData = new FormData();
+            formData.append('image', file);
+
+            const response = await fetch('/api/upload-bundle-image', {
+              method: 'POST',
+              body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+              imageKeyInput.value = result.image_key;
+              uploadArea.innerHTML = `
+                <img src="${result.image_url}" style="max-width: 100%; max-height: 200px; border-radius: 8px;" />
+                <p style="color: #34c759; margin-top: 16px;">✅ Nuova immagine caricata!</p>
+                <div class="upload-progress" style="width: 0%; height: 4px; background: #007aff; margin-top: 16px; border-radius: 2px; display: none;"></div>
+              `;
+            } else {
+              throw new Error(result.error || 'Errore durante il caricamento');
+            }
+          } catch (error) {
+            console.error('Upload error:', error);
+            await showError('Errore durante il caricamento dell\'immagine', 'Errore Upload');
+          } finally {
+            progressBar.style.display = 'none';
+          }
+        }
+      }
+
+      // Auto-hide flash messages
+      const flashMessages = document.querySelectorAll('.flash-message');
+      flashMessages.forEach(function(message) {
+        setTimeout(function() {
+          message.style.opacity = '0';
+          setTimeout(function() {
+            message.remove();
+          }, 300);
+        }, 5000);
+      });
+    });
+  </script>
+</body>
+</html>

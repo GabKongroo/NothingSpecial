@@ -76,6 +76,178 @@ class ToastManager {
 // Initialize toast manager
 const toastManager = new ToastManager();
 
+// Custom Modal System (iOS-friendly replacement for confirm/alert)
+class ModalManager {
+  constructor() {
+    this.modalId = 0;
+    this.activeModals = new Map();
+    this.init();
+  }
+
+  init() {
+    // Create modal container if it doesn't exist
+    if (!document.getElementById('modal-container')) {
+      const container = document.createElement('div');
+      container.id = 'modal-container';
+      document.body.appendChild(container);
+    }
+  }
+
+  async confirm(title, message, options = {}) {
+    return new Promise((resolve) => {
+      const id = ++this.modalId;
+      const modal = this.createModal(id, title, message, 'confirm', options);
+      
+      const container = document.getElementById('modal-container');
+      container.appendChild(modal);
+      
+      this.activeModals.set(id, { modal, resolve });
+      
+      // Show modal
+      requestAnimationFrame(() => {
+        modal.classList.add('active');
+      });
+    });
+  }
+
+  async alert(title, message, options = {}) {
+    return new Promise((resolve) => {
+      const id = ++this.modalId;
+      const modal = this.createModal(id, title, message, 'alert', options);
+      
+      const container = document.getElementById('modal-container');
+      container.appendChild(modal);
+      
+      this.activeModals.set(id, { modal, resolve });
+      
+      // Show modal
+      requestAnimationFrame(() => {
+        modal.classList.add('active');
+      });
+    });
+  }
+
+  createModal(id, title, message, type, options = {}) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = `modal-${id}`;
+
+    const iconMap = {
+      confirm: '❓',
+      alert: '⚠️',
+      error: '❌',
+      info: 'ℹ️',
+      warning: '⚠️'
+    };
+
+    const iconClass = options.type || (type === 'confirm' ? 'warning' : 'info');
+    const icon = options.icon || iconMap[type] || iconMap.info;
+
+    const confirmText = options.confirmText || 'Conferma';
+    const cancelText = options.cancelText || 'Annulla';
+
+    let actions = '';
+    if (type === 'confirm') {
+      actions = `
+        <div class="modal-actions">
+          <button class="modal-btn secondary" onclick="modalManager.close(${id}, false)">
+            ${cancelText}
+          </button>
+          <button class="modal-btn danger" onclick="modalManager.close(${id}, true)">
+            ${confirmText}
+          </button>
+        </div>
+      `;
+    } else {
+      actions = `
+        <div class="modal-actions">
+          <button class="modal-btn primary" onclick="modalManager.close(${id}, true)">
+            OK
+          </button>
+        </div>
+      `;
+    }
+
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-icon ${iconClass}">${icon}</div>
+          <div class="modal-title">${title}</div>
+        </div>
+        <div class="modal-message">${message}</div>
+        ${actions}
+      </div>
+    `;
+
+    // Close on backdrop click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        this.close(id, false);
+      }
+    });
+
+    // Handle keyboard events
+    const handleKeydown = (e) => {
+      if (e.key === 'Escape') {
+        this.close(id, false);
+      } else if (e.key === 'Enter' && type === 'alert') {
+        this.close(id, true);
+      }
+    };
+
+    overlay.addEventListener('keydown', handleKeydown);
+
+    return overlay;
+  }
+
+  close(id, result) {
+    const modalData = this.activeModals.get(id);
+    if (modalData) {
+      const { modal, resolve } = modalData;
+      
+      // Animate out
+      modal.classList.remove('active');
+      
+      // Remove from DOM after animation
+      setTimeout(() => {
+        if (modal.parentNode) {
+          modal.parentNode.removeChild(modal);
+        }
+        resolve(result);
+      }, 300);
+      
+      this.activeModals.delete(id);
+    }
+  }
+
+  // Convenience methods
+  async showError(message, title = 'Errore') {
+    return this.alert(title, message, { type: 'error', icon: '❌' });
+  }
+
+  async showSuccess(message, title = 'Successo') {
+    return this.alert(title, message, { type: 'success', icon: '✅' });
+  }
+
+  async showWarning(message, title = 'Attenzione') {
+    return this.alert(title, message, { type: 'warning', icon: '⚠️' });
+  }
+
+  async showInfo(message, title = 'Informazione') {
+    return this.alert(title, message, { type: 'info', icon: 'ℹ️' });
+  }
+}
+
+const modalManager = new ModalManager();
+
+// Global helper functions to replace native alert/confirm
+window.showAlert = (message, title = 'Attenzione') => modalManager.alert(title, message);
+window.showConfirm = (message, title = 'Conferma') => modalManager.confirm(title, message);
+window.showError = (message, title = 'Errore') => modalManager.showError(message, title);
+window.showSuccess = (message, title = 'Successo') => modalManager.showSuccess(message, title);
+window.showWarning = (message, title = 'Attenzione') => modalManager.showWarning(message, title);
+window.showInfo = (message, title = 'Informazione') => modalManager.showInfo(message, title);
+
 // Enhanced error handling with better UX
 class ErrorHandler {
   constructor() {
@@ -239,21 +411,21 @@ class BeatValidator {
     const errors = [];
 
     // Validate original price
-    if (!beatData.originalPrice || beatData.originalPrice <= 0) {
+    if (!beatData.original_price || beatData.original_price <= 0) {
       errors.push('Il prezzo originale deve essere maggiore di 0');
     }
 
     // Validate discount logic
-    if (beatData.isDiscounted) {
-      if (!beatData.discountedPrice || beatData.discountedPrice <= 0) {
+    if (beatData.is_discounted) {
+      if (!beatData.discounted_price || beatData.discounted_price <= 0) {
         errors.push('Il prezzo scontato deve essere maggiore di 0');
       }
       
-      if (beatData.discountedPrice >= beatData.originalPrice) {
+      if (beatData.discounted_price >= beatData.original_price) {
         errors.push('Il prezzo scontato deve essere minore del prezzo originale');
       }
       
-      if (!beatData.discountPercent || beatData.discountPercent <= 0 || beatData.discountPercent > 99) {
+      if (!beatData.discount_percent || beatData.discount_percent <= 0 || beatData.discount_percent > 99) {
         errors.push('La percentuale di sconto deve essere tra 1 e 99');
       }
     }
@@ -295,12 +467,14 @@ class BeatValidator {
 // Initialize validator
 const validator = new BeatValidator();
 
-// Enhanced beat management with better UX
+// Enhanced beat management with mobile support and position preservation
 class BeatManager {
   constructor() {
     this.beats = new Map();
     this.initializeEventListeners();
     this.loadBeatsFromDOM();
+    this.initializeMobileControls();
+    this.initializeScrollToSaved();
   }
 
   loadBeatsFromDOM() {
@@ -374,11 +548,148 @@ class BeatManager {
     loadingManager.showButtonLoading(button);
 
     try {
-      // Simulate API call
-      await this.simulateApiCall(1000);
-      
-      errorHandler.showSuccess(`Beat salvato con successo!`);
-      return true;
+      // Create form data for single beat save
+      const formData = new FormData();
+      formData.append(`original_price_${beatId}`, beat.originalPrice);
+      formData.append(`discounted_price_${beatId}`, beat.discountedPrice || '');
+      formData.append(`is_exclusive_${beatId}`, beat.isExclusive ? '1' : '0');
+      formData.append(`is_discounted_${beatId}`, beat.isDiscounted ? '1' : '0');
+      formData.append(`discount_percent_${beatId}`, beat.discountPercent);
+
+      const response = await fetch(window.location.pathname, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        // Redirect with scroll parameter to maintain position
+        const url = new URL(window.location);
+        url.searchParams.set('scroll_to_beat', beatId);
+        window.location.href = url.toString();
+        return true;
+      } else {
+        throw new Error('Errore durante il salvataggio');
+      }
+    } catch (error) {
+      errorHandler.showError(beatId, 'Errore durante il salvataggio. Riprova.');
+      return false;
+    } finally {
+      loadingManager.hideButtonLoading(button);
+    }
+  }
+
+  initializeMobileControls() {
+    // Only add mobile controls if we're on mobile
+    if (window.innerWidth <= 768) {
+      this.addMobileControls();
+    }
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 768 && !document.querySelector('.mobile-controls')) {
+        this.addMobileControls();
+      } else if (window.innerWidth > 768) {
+        this.removeMobileControls();
+      }
+    });
+  }
+
+  addMobileControls() {
+    if (document.querySelector('.mobile-controls')) return;
+    
+    const mobileControls = document.createElement('div');
+    mobileControls.className = 'mobile-controls';
+    mobileControls.innerHTML = `
+      <div class="mobile-nav-controls">
+        <button class="mobile-nav-btn" onclick="beatManager.scrollToTop()" title="Vai all'inizio">
+          ⬆️
+        </button>
+        <button class="mobile-nav-btn" onclick="beatManager.scrollToBottom()" title="Vai alla fine">
+          ⬇️
+        </button>
+      </div>
+      <button class="mobile-save-all" onclick="beatManager.saveAllBeats()" title="Salva tutti">
+        <span class="btn-icon">💾</span>
+        <div class="btn-loading" style="display: none;">
+          <div class="btn-spinner"></div>
+        </div>
+      </button>
+    `;
+    
+    document.body.appendChild(mobileControls);
+  }
+
+  removeMobileControls() {
+    const controls = document.querySelector('.mobile-controls');
+    if (controls) {
+      controls.remove();
+    }
+  }
+
+  scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  scrollToBottom() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  initializeScrollToSaved() {
+    // Check if we should scroll to a specific beat after page load
+    const urlParams = new URLSearchParams(window.location.search);
+    const scrollToBeat = urlParams.get('scroll_to_beat');
+    
+    if (scrollToBeat) {
+      setTimeout(() => {
+        const beatCard = document.getElementById(`beat-card-${scrollToBeat}`);
+        if (beatCard) {
+          beatCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          beatCard.classList.add('saving-highlight');
+          
+          // Remove highlight after animation
+          setTimeout(() => {
+            beatCard.classList.remove('saving-highlight');
+          }, 1000);
+        }
+      }, 100);
+    }
+  }
+
+  async saveBeat(beatId) {
+    const beat = this.getBeatDataFromDOM(beatId);
+    const errors = validator.validateBeat(beat);
+
+    if (errors.length > 0) {
+      errorHandler.showError(beatId, errors[0]);
+      return false;
+    }
+
+    const button = document.querySelector(`button[data-beat-id='${beatId}']`);
+    loadingManager.showButtonLoading(button);
+
+    try {
+      // Create form data for single beat save
+      const formData = new FormData();
+      formData.append(`original_price_${beatId}`, beat.originalPrice);
+      formData.append(`discounted_price_${beatId}`, beat.discountedPrice || '');
+      formData.append(`is_exclusive_${beatId}`, beat.isExclusive ? '1' : '0');
+      formData.append(`is_discounted_${beatId}`, beat.isDiscounted ? '1' : '0');
+      formData.append(`discount_percent_${beatId}`, beat.discountPercent);
+
+      const response = await fetch(window.location.pathname, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        // Redirect with scroll parameter to maintain position
+        const url = new URL(window.location);
+        url.searchParams.set('scroll_to_beat', beatId);
+        window.location.href = url.toString();
+        return true;
+      } else {
+        throw new Error('Errore durante il salvataggio');
+      }
     } catch (error) {
       errorHandler.showError(beatId, 'Errore durante il salvataggio. Riprova.');
       return false;
@@ -388,48 +699,139 @@ class BeatManager {
   }
 
   async saveAllBeats() {
-    const allBeats = Array.from(this.beats.keys()).map(id => this.getBeatDataFromDOM(id));
-    const hasErrors = allBeats.some(beat => validator.validateBeat(beat).length > 0);
+    console.log('🔄 saveAllBeats() chiamata'); // Debug
+    
+    // Check if we're on the right page
+    const beatCards = document.querySelectorAll('.beat-card');
+    if (beatCards.length === 0) {
+      console.warn('⚠️ No beat cards found on this page');
+      toastManager.show('Nessun beat trovato per il salvataggio', 'warning', {
+        title: 'Nessun Beat'
+      });
+      return;
+    }
+    
+    console.log(`📊 Found ${beatCards.length} beat cards`); // Debug
+    
+    // Raccolta dati LIVE dal DOM invece che dalla cache
+    const allBeats = [];
+    document.querySelectorAll('.beat-card').forEach(card => {
+      const beatId = parseInt(card.dataset.beatId);
+      if (!beatId) return;
+      
+      const originalPriceInput = card.querySelector(`input[name='original_price_${beatId}']`);
+      const discountedPriceInput = card.querySelector(`input[name='discounted_price_${beatId}']`);
+      const isExclusiveInput = card.querySelector(`input[name='is_exclusive_${beatId}']:checked`);
+      const isDiscountedInput = card.querySelector(`input[name='is_discounted_${beatId}']:checked`);
+      const discountPercentInput = card.querySelector(`input[name='discount_percent_${beatId}']`);
+      
+      const beatData = {
+        id: beatId,
+        original_price: parseFloat(originalPriceInput?.value) || 0,
+        discounted_price: parseFloat(discountedPriceInput?.value) || 0,
+        is_exclusive: isExclusiveInput ? 1 : 0,
+        is_discounted: isDiscountedInput ? 1 : 0,
+        discount_percent: parseInt(discountPercentInput?.value) || 0
+      };
+      
+      console.log(`Beat ${beatId} data:`, beatData); // Debug
+      allBeats.push(beatData);
+    });
+    
+    console.log('📊 Dati raccolti:', allBeats); // Debug
+
+    // Debug validazione
+    console.log('🔍 Inizio validazione beat...');
+    let hasErrors = false;
+    let errorMessages = [];
+    
+    allBeats.forEach((beat, index) => {
+      const errors = validator.validateBeat(beat);
+      if (errors.length > 0) {
+        console.error(`❌ Errori validazione beat ${beat.id}:`, errors);
+        console.error(`Beat data:`, beat);
+        hasErrors = true;
+        errorMessages = errorMessages.concat(errors);
+      } else {
+        console.log(`✅ Beat ${beat.id} validato correttamente`);
+      }
+    });
 
     if (hasErrors) {
-      toastManager.show('Correggi tutti gli errori prima di salvare', 'error', {
-        title: 'Validazione Fallita'
+      console.error('❌ Validazione fallita. Errori trovati:', errorMessages);
+      toastManager.show('Correggi tutti gli errori prima di salvare: ' + errorMessages.join(', '), 'error', {
+        title: 'Validazione Fallita',
+        duration: 8000
       });
       return false;
     }
 
-    const button = document.getElementById('save-all-btn');
-    loadingManager.showButtonLoading(button);
+    // Handle both desktop and mobile save buttons
+    const desktopButton = document.getElementById('save-all-btn');
+    const mobileButton = document.getElementById('mobile-save-all-btn');
+    
+    if (desktopButton) loadingManager.showButtonLoading(desktopButton);
+    if (mobileButton) loadingManager.showButtonLoading(mobileButton);
+    
     loadingManager.showOverlay();
 
     try {
-      // Simulate API call
-      await this.simulateApiCall(2000);
+      console.log('📡 Invio dati al server...'); // Debug
       
-      errorHandler.showSuccess('Tutti i beat sono stati salvati con successo!');
-      return true;
+      // Send data to server
+      const response = await fetch('/api/save-all-beats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ beats: allBeats })
+      });
+
+      console.log('📨 Risposta server status:', response.status); // Debug
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('📊 Risultato server:', result); // Debug
+
+      if (result.success) {
+        toastManager.show(result.message || 'Tutti i beat sono stati salvati con successo!', 'success', {
+          title: 'Salvataggio Completato'
+        });
+        
+        // Reload the page to show updated data
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+        
+        return true;
+      } else {
+        toastManager.show(result.error || 'Errore durante il salvataggio', 'error', {
+          title: 'Errore di Salvataggio'
+        });
+        
+        // Show detailed errors if available
+        if (result.details && Array.isArray(result.details)) {
+          result.details.forEach(detail => {
+            toastManager.show(detail, 'error', { duration: 8000 });
+          });
+        }
+        
+        return false;
+      }
     } catch (error) {
-      toastManager.show('Errore durante il salvataggio. Riprova.', 'error', {
+      console.error('❌ Errore durante il salvataggio:', error);
+      toastManager.show('Errore di connessione. Verifica la tua connessione internet e riprova.', 'error', {
         title: 'Errore di Rete'
       });
       return false;
     } finally {
-      loadingManager.hideButtonLoading(button);
+      if (desktopButton) loadingManager.hideButtonLoading(desktopButton);
+      if (mobileButton) loadingManager.hideButtonLoading(mobileButton);
       loadingManager.hideOverlay();
     }
-  }
-
-  simulateApiCall(delay) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Simulate occasional failures for demo
-        if (Math.random() > 0.9) {
-          reject(new Error('Network error'));
-        } else {
-          resolve();
-        }
-      }, delay);
-    });
   }
 
   initializeEventListeners() {
@@ -489,16 +891,236 @@ class BeatManager {
   }
 }
 
-// Initialize beat manager when DOM is loaded
+// Image upload handler for bundles
+class ImageUploadManager {
+  constructor() {
+    this.isUploading = false;
+    this.initializeUploadHandlers();
+  }
+
+  initializeUploadHandlers() {
+    const uploadArea = document.getElementById('image-upload-area');
+    const fileInput = document.getElementById('bundle-image-input');
+    
+    if (!uploadArea || !fileInput) return;
+
+    // Click to upload
+    uploadArea.addEventListener('click', () => {
+      if (!this.isUploading) {
+        fileInput.click();
+      }
+    });
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!this.isUploading) {
+        uploadArea.classList.add('dragover');
+      }
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      if (!this.isUploading) {
+        uploadArea.classList.remove('dragover');
+      }
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      
+      if (!this.isUploading && e.dataTransfer.files.length > 0) {
+        this.handleFileUpload(e.dataTransfer.files[0]);
+      }
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+      if (!this.isUploading && e.target.files.length > 0) {
+        this.handleFileUpload(e.target.files[0]);
+      }
+    });
+  }
+
+  async handleFileUpload(file) {
+    // Prevent multiple uploads
+    if (this.isUploading) {
+      console.log('Upload already in progress, ignoring...');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toastManager.show('Per favore seleziona un file immagine valido', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toastManager.show('Il file è troppo grande. Massimo 5MB consentiti.', 'error');
+      return;
+    }
+
+    this.isUploading = true;
+    const uploadArea = document.getElementById('image-upload-area');
+    const fileInput = document.getElementById('bundle-image-input');
+    
+    try {
+      // Show loading state
+      uploadArea.innerHTML = `
+        <div style="font-size: 40px; margin-bottom: 20px;">⏳</div>
+        <p style="color: #007aff; margin-bottom: 8px; font-weight: 600;">Caricamento in corso...</p>
+        <div class="upload-progress" style="width: 0%; height: 4px; background: #007aff; margin: 20px auto; border-radius: 2px; max-width: 200px; display: block;"></div>
+      `;
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('image', file);
+
+      // If there's already an image uploaded, send its key for deletion
+      const imageKeyInput = document.querySelector('input[name="image_key"]');
+      if (imageKeyInput && imageKeyInput.value) {
+        formData.append('previous_image_key', imageKeyInput.value);
+        console.log('Will delete previous image:', imageKeyInput.value);
+      }
+
+      // Upload with progress tracking
+      const xhr = await this.uploadWithProgress('/api/upload-bundle-image', formData, (progress) => {
+        const progressBar = uploadArea.querySelector('.upload-progress');
+        if (progressBar) {
+          progressBar.style.width = `${progress}%`;
+        }
+      });
+
+      console.log('Upload response status:', xhr.status);
+      console.log('Upload response text:', xhr.responseText);
+      
+      const result = JSON.parse(xhr.responseText);
+      console.log('Upload result:', result);
+
+      if (result.success) {
+        // Update the image key field
+        if (imageKeyInput) {
+          imageKeyInput.value = result.image_key;
+        }
+
+        // Show preview
+        this.showImagePreview(result.image_url);
+        
+        toastManager.show('Immagine caricata con successo!', 'success');
+      } else {
+        throw new Error(result.error || 'Errore durante il caricamento');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toastManager.show('Errore durante il caricamento dell\'immagine', 'error');
+      
+      // Reset upload area on error
+      this.resetUploadArea();
+    } finally {
+      this.isUploading = false;
+      // Clear file input to allow re-uploading the same file
+      fileInput.value = '';
+    }
+  }
+
+  async uploadWithProgress(url, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const progress = (e.loaded / e.total) * 100;
+          onProgress(progress);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr);
+        } else {
+          reject(new Error(`HTTP ${xhr.status}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => reject(new Error('Network error')));
+      
+      xhr.open('POST', url);
+      xhr.send(formData);
+    });
+  }
+
+  showImagePreview(imageUrl) {
+    const uploadArea = document.getElementById('image-upload-area');
+    
+    // Update the upload area with the new image
+    uploadArea.innerHTML = `
+      <img src="${imageUrl}" style="max-width: 100%; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);" />
+      <p style="color: #34c759; margin-top: 16px; font-weight: 600;">✅ Immagine caricata con successo!</p>
+      <p style="color: #6c757d; font-size: 14px; margin-top: 8px;">Clicca per cambiare immagine</p>
+      <div class="upload-progress" style="width: 0%; height: 4px; background: #007aff; margin-top: 20px; border-radius: 2px; display: none;"></div>
+    `;
+  }
+
+  resetUploadArea() {
+    const uploadArea = document.getElementById('image-upload-area');
+    
+    // Reset to initial state
+    uploadArea.innerHTML = `
+      <div style="font-size: 60px; margin-bottom: 20px;">📸</div>
+      <p style="color: #1d1d1f; margin-bottom: 8px; font-weight: 600; font-size: 16px;">Clicca per caricare un'immagine</p>
+      <p style="color: #6c757d; font-size: 14px; margin-bottom: 0;">o trascina qui il file (max 5MB)</p>
+      <div class="upload-progress" style="width: 0%; height: 4px; background: #007aff; margin-top: 20px; border-radius: 2px; display: none;"></div>
+    `;
+  }
+}
+
+// Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  const beatManager = new BeatManager();
+  console.log('🚀 Initializing Beat Management System...');
+  
+  window.beatManager = new BeatManager();
+  window.imageUploadManager = new ImageUploadManager();
+  
+  console.log('✅ BeatManager instance created:', window.beatManager);
+  
+  // Add listener for "Save All" button (both desktop and mobile)
+  const saveAllBtn = document.getElementById('save-all-btn');
+  const mobileSaveAllBtn = document.getElementById('mobile-save-all-btn');
+  
+  function handleSaveAllClick() {
+    console.log('🔄 Save All button clicked, calling beatManager.saveAllBeats()');
+    if (window.beatManager && typeof window.beatManager.saveAllBeats === 'function') {
+      window.beatManager.saveAllBeats();
+    } else {
+      console.error('❌ beatManager.saveAllBeats is not available');
+      toastManager.show('Errore: Sistema di gestione beat non disponibile', 'error', {
+        title: 'Errore Sistema'
+      });
+    }
+  }
+  
+  if (saveAllBtn) {
+    console.log('✅ Desktop Save All button found, adding event listener');
+    saveAllBtn.addEventListener('click', handleSaveAllClick);
+  } else {
+    console.warn('⚠️ Desktop Save All button not found on this page');
+  }
+  
+  if (mobileSaveAllBtn) {
+    console.log('✅ Mobile Save All button found, adding event listener');
+    mobileSaveAllBtn.addEventListener('click', handleSaveAllClick);
+  } else {
+    console.warn('⚠️ Mobile Save All button not found on this page');
+  }
   
   // Add some helpful keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     // Ctrl/Cmd + S to save all
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
-      beatManager.saveAllBeats();
+      console.log('⌨️ Keyboard shortcut Ctrl+S pressed');
+      if (window.beatManager && typeof window.beatManager.saveAllBeats === 'function') {
+        window.beatManager.saveAllBeats();
+      }
     }
     
     // Escape to clear all toasts
@@ -533,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  console.log('🎵 Beat Management System initialized successfully!');
+  console.log('🎵 Enhanced Beat Management System initialized successfully!');
 });
 
 // Export for potential external use
@@ -611,3 +1233,283 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+// Database Operations
+async function updateDatabase() {
+  const button = document.getElementById('update-db-btn');
+  if (!button) return;
+
+  loadingManager.showButtonLoading(button);
+  loadingManager.showOverlay();
+
+  // Show progress bar
+  const progressBar = document.querySelector('.progress-fill');
+  const progressText = document.querySelector('.progress-text');
+  const statusText = document.querySelector('.status-text');
+  
+  if (progressBar && progressText && statusText) {
+    progressBar.style.width = '0%';
+    progressText.textContent = '0%';
+    statusText.textContent = 'Scansione in corso su Google Drive...';
+    
+    // Simulate progress updates for better UX
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+      progress += Math.random() * 5;
+      if (progress > 90) progress = 90; // Don't go over 90% until real completion
+      
+      progressBar.style.width = `${progress}%`;
+      progressText.textContent = `${Math.round(progress)}%`;
+      
+      if (progress > 30) statusText.textContent = 'Processando file da Google Drive...';
+      if (progress > 60) statusText.textContent = 'Caricamento su Cloudflare R2...';
+      if (progress > 80) statusText.textContent = 'Aggiornamento database...';
+    }, 500);
+
+    try {
+      console.log('🔄 Starting database update...');
+      
+      const response = await fetch('/admin/update-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const result = await response.json();
+      
+      // Clear progress simulation
+      clearInterval(progressInterval);
+      
+      if (result.success) {
+        // Complete progress
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        statusText.textContent = 'Aggiornamento completato!';
+        
+        setTimeout(() => {
+          loadingManager.hideOverlay();
+          loadingManager.hideButtonLoading(button);
+          
+          toastManager.show(result.message || 'Database aggiornato con successo!', 'success', {
+            title: 'Aggiornamento Completato',
+            duration: 5000
+          });
+          
+          // Show details if available
+          if (result.details) {
+            console.log('📊 Update details:', result.details);
+            toastManager.show(result.details, 'info', {
+              title: 'Dettagli Aggiornamento',
+              duration: 8000
+            });
+          }
+          
+          // Refresh page to show updated stats
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }, 1000);
+      } else {
+        throw new Error(result.error || 'Errore durante l\'aggiornamento del database');
+      }
+      
+    } catch (error) {
+      clearInterval(progressInterval);
+      console.error('❌ Database update error:', error);
+      
+      // Show error in progress bar
+      progressBar.style.width = '100%';
+      progressBar.style.backgroundColor = '#ff3b30';
+      progressText.textContent = 'Errore!';
+      statusText.textContent = 'Errore durante l\'aggiornamento';
+      
+      setTimeout(() => {
+        loadingManager.hideOverlay();
+        loadingManager.hideButtonLoading(button);
+        
+        toastManager.show(error.message || 'Errore durante l\'aggiornamento del database', 'error', {
+          title: 'Errore Aggiornamento Database',
+          duration: 8000
+        });
+      }, 1000);
+    }
+  } else {
+    // Fallback without progress bar
+    try {
+      const response = await fetch('/admin/update-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        loadingManager.hideOverlay();
+        loadingManager.hideButtonLoading(button);
+        
+        toastManager.show(result.message || 'Database aggiornato con successo!', 'success', {
+          title: 'Aggiornamento Completato'
+        });
+        
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        throw new Error(result.error || 'Errore durante l\'aggiornamento del database');
+      }
+      
+    } catch (error) {
+      console.error('❌ Database update error:', error);
+      toastManager.show(error.message || 'Errore durante l\'aggiornamento del database', 'error', {
+        title: 'Errore Aggiornamento Database'
+      });
+      loadingManager.hideButtonLoading(button);
+      loadingManager.hideOverlay();
+    }
+  }
+}
+
+async function resetDatabase() {
+  const button = document.getElementById('reset-db-btn');
+  if (!button) return;
+
+  // Confirm action with custom modal
+  const confirmed = await modalManager.confirm(
+    'Conferma Reset Database',
+    'Sei sicuro di voler resettare il database? Questa operazione cancellerà tutti i dati esistenti!',
+    { 
+      confirmText: 'Sì, Reset',
+      cancelText: 'Annulla' 
+    }
+  );
+  
+  if (!confirmed) {
+    return;
+  }
+
+  loadingManager.showButtonLoading(button);
+  loadingManager.showOverlay();
+
+  try {
+    console.log('🔄 Starting database reset...');
+    
+    // Update progress manually since reset doesn't use SSE
+    const progressBar = document.querySelector('.progress-fill');
+    const progressText = document.querySelector('.progress-text');
+    const statusText = document.querySelector('.status-text');
+    
+    if (progressBar && progressText && statusText) {
+      progressBar.style.width = '0%';
+      progressText.textContent = '0%';
+      statusText.textContent = 'Reset database in corso...';
+      
+      // Simulate progress during reset
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 10;
+        if (progress <= 90) {
+          progressBar.style.width = `${progress}%`;
+          progressText.textContent = `${progress}%`;
+          statusText.textContent = progress < 50 ? 'Eliminazione tabelle...' : 'Ricreazione schema...';
+        }
+      }, 200);
+      
+      const response = await fetch('/admin/reset-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      clearInterval(progressInterval);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('📊 Reset result:', result);
+      
+      if (result.success) {
+        // Complete progress
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        statusText.textContent = 'Reset completato!';
+        
+        // Update statistics in real time
+        updateDatabaseStats();
+        
+        setTimeout(() => {
+          loadingManager.hideOverlay();
+          loadingManager.hideButtonLoading(button);
+          
+          toastManager.show(result.message || 'Database resettato con successo!', 'success', {
+            title: 'Reset Completato'
+          });
+          
+          // Refresh page to show updated stats
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }, 1000);
+      } else {
+        throw new Error(result.error || 'Errore durante il reset del database');
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Database reset error:', error);
+    toastManager.show(error.message || 'Errore durante il reset del database', 'error', {
+      title: 'Errore Reset Database'
+    });
+    loadingManager.hideButtonLoading(button);
+    loadingManager.hideOverlay();
+  }
+}
+
+// Function to update database statistics in real time
+async function updateDatabaseStats() {
+  try {
+    const response = await fetch('/admin/database-stats', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (response.ok) {
+      const stats = await response.json();
+      
+      // Update stat cards with animation
+      const statCards = document.querySelectorAll('.stat-number');
+      if (statCards.length >= 4) {
+        // Animate the stats update
+        statCards[0].style.transition = 'all 0.5s ease';
+        statCards[1].style.transition = 'all 0.5s ease';
+        statCards[2].style.transition = 'all 0.5s ease';
+        statCards[3].style.transition = 'all 0.5s ease';
+        
+        // Update values
+        statCards[0].textContent = stats.total_beats || 0;
+        statCards[1].textContent = stats.exclusive_beats || 0;
+        statCards[2].textContent = stats.active_bundles || 0;
+        statCards[3].textContent = stats.sold_exclusive_count || 0;
+        
+        // Add visual feedback
+        statCards.forEach(card => {
+          card.style.transform = 'scale(1.1)';
+          setTimeout(() => {
+            card.style.transform = 'scale(1)';
+          }, 200);
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error updating database stats:', error);
+  }
+}
+
+// Database operations are now synchronous - no progress tracking needed
