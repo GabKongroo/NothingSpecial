@@ -1,9 +1,0 @@
-[build]
-builder = "dockerfile"
-
-[deploy]
-restartPolicyType = "always"
-
-[env]
-PORT = "8000"
-ENVIRONMENT = "production"
