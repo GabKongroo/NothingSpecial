@@ -3,8 +3,7 @@ builder = "dockerfile"
 
 [deploy]
 restartPolicyType = "always"
-healthcheckPath = "/health"
-healthcheckTimeout = 300
+
 
 [env]
 PORT = "8000"
