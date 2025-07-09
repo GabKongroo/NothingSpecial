@@ -23,3 +23,8 @@ Pillow==11.2.1
 
 # Audio processing (for FFmpeg integration)
 # Note: FFmpeg binary needs to be installed separately on the system
+
+# Additional dependencies for stability
+urllib3==2.3.0
+requests==2.32.3
+six==1.17.0
