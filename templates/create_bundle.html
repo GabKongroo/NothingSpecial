@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Crea Bundle - Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <style>
+    @media (max-width: 768px) {
+      .center-container {
+        max-width: 100% !important;
+        padding: 0 12px !important;
+      }
+      .bundle-card {
+        max-width: none !important;
+        padding: 20px !important;
+      }
+      .beat-selection-item {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+      }
+      .beat-checkbox-section {
+        margin-left: 0 !important;
+        align-self: flex-end !important;
+      }
+      .form-actions {
+        flex-direction: column !important;
+        gap: 12px !important;
+      }
+      .form-actions a,
+      .form-actions button {
+        width: 100% !important;
+      }
+    }
+    
+    @media (min-width: 1200px) {
+      .bundle-card {
+        max-width: 1000px !important;
+      }
+    }
+    
+    /* Nascondi i pulsanti mobili nelle pagine bundle e database */
+    .hide-mobile-controls .mobile-control-btn {
+      display: none !important;
+    }
+    
+    /* Assicurati che i pulsanti mobili siano visibili solo nella pagina principale */
+    body:not(.main-admin-page) .mobile-control-btn {
+      display: none !important;
+    }
+  </style>
+</head>
+<body class="bundle-creation-page">
+  <div id="toast-container" class="toast-container"></div>
+  <div id="modal-container"></div>
+
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <div class="logo-section">
+        <div class="logo-icon">🎁</div>
+        <h2>Crea Nuovo Bundle</h2>
+      </div>
+      {% if session.get('logged_in') %}
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+          <button type="submit" class="logout-btn">
+            <span class="logout-icon">🚪</span>
+            <span class="logout-text">Logout</span>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="center-container" style="max-width: 95%; width: 100%; margin: 0 auto; padding: 0 20px;">
+    {% if session.get('logged_in') %}
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages" style="margin-bottom: 24px; max-width: 800px; margin-left: auto; margin-right: auto;">
+            {% for category, message in messages %}
+              <div class="flash-message flash-{{ category }}" style="padding: 16px 20px; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; {% if category == 'success' %}background: rgba(52, 199, 89, 0.1); color: #34c759; border: 1px solid rgba(52, 199, 89, 0.2);{% elif category == 'error' %}background: rgba(255, 59, 48, 0.1); color: #ff3b30; border: 1px solid rgba(255, 59, 48, 0.2);{% else %}background: rgba(0, 122, 255, 0.1); color: #007aff; border: 1px solid rgba(0, 122, 255, 0.2);{% endif %}">
+                <span class="flash-icon" style="font-size: 18px;">
+                  {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}ℹ️{% endif %}
+                </span>
+                <span style="font-weight: 500;">{{ message }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <!-- Breadcrumb -->
+      <div style="margin: 40px auto 32px auto; max-width: 800px; text-align: center;">
+        <a href="#" onclick="handleCancelBundle(); return false;" style="color: #007aff; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: white; border: 2px solid #007aff; border-radius: 12px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0, 122, 255, 0.1);" onmouseover="this.style.background='#007aff'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='#007aff';">
+          <span>←</span>
+          <span>Torna ai Bundle</span>
+        </a>
+      </div>
+
+      <!-- Form di creazione bundle -->
+      <form method="post" class="bundle-form">
+        <div class="bundle-card" style="background: white; border-radius: 20px; padding: 32px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid #f0f0f0; margin-bottom: 24px; max-width: 800px; margin-left: auto; margin-right: auto; width: 100%;">
+          <h3 style="margin-bottom: 32px; color: #1d1d1f; font-size: 24px; font-weight: 700; text-align: center;">📦 Informazioni Bundle</h3>
+          
+          <!-- Nome Bundle -->
+          <div class="beat-field" style="margin-bottom: 24px;">
+            <label class="beat-label" style="display: block; font-weight: 600; color: #1d1d1f; margin-bottom: 8px; font-size: 16px;">Nome Bundle <span style="color: #ff3b30;">*</span></label>
+            <input type="text" name="name" required 
+                   placeholder="Es: Hip-Hop Vibes Pack" 
+                   style="width: 100%; padding: 16px 20px; border: 2px solid #e5e5e7; border-radius: 12px; font-size: 16px; transition: all 0.2s; box-sizing: border-box;" />
+          </div>
+
+          <!-- Descrizione Bundle -->
+          <div class="beat-field" style="margin-bottom: 24px;">
+            <label class="beat-label" style="display: block; font-weight: 600; color: #1d1d1f; margin-bottom: 8px; font-size: 16px;">Descrizione</label>
+            <textarea name="description" rows="4" 
+                      placeholder="Descrizione opzionale del bundle..."
+                      style="width: 100%; padding: 16px 20px; border: 2px solid #e5e5e7; border-radius: 12px; font-size: 16px; resize: vertical; transition: all 0.2s; box-sizing: border-box;"></textarea>
+          </div>
+
+          <!-- Prezzo Bundle -->
+          <div class="beat-field" style="margin-bottom: 32px;">
+            <label class="beat-label" style="display: block; font-weight: 600; color: #1d1d1f; margin-bottom: 8px; font-size: 16px;">Prezzo Bundle (€) <span style="color: #ff3b30;">*</span></label>
+            <input type="number" name="bundle_price" step="0.01" min="0.01" required 
+                   placeholder="Es: 29.99"
+                   style="width: 100%; padding: 16px 20px; border: 2px solid #e5e5e7; border-radius: 12px; font-size: 16px; transition: all 0.2s; box-sizing: border-box;" />
+          </div>
+
+          <!-- Upload Immagine Bundle -->
+          <div class="beat-field" style="margin-bottom: 32px;">
+            <label class="beat-label" style="display: block; font-weight: 600; color: #1d1d1f; margin-bottom: 8px; font-size: 16px;">Immagine Bundle (opzionale)</label>
+            <div id="image-upload-area" style="border: 2px dashed #e5e5e7; border-radius: 16px; padding: 50px 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa;">
+              <div style="font-size: 60px; margin-bottom: 20px;">📸</div>
+              <p style="color: #1d1d1f; margin-bottom: 8px; font-weight: 600; font-size: 16px;">Clicca per caricare un'immagine</p>
+              <p style="color: #6c757d; font-size: 14px; margin-bottom: 0;">o trascina qui il file (max 5MB)</p>
+              <div class="upload-progress" style="width: 0%; height: 4px; background: #007aff; margin-top: 20px; border-radius: 2px; display: none;"></div>
+            </div>
+            <input type="file" id="bundle-image-input" accept="image/*" style="display: none;" />
+            <input type="hidden" name="image_key" />
+          </div>
+
+          <!-- Selezione Beat -->
+          <div class="beat-field">
+            <label class="beat-label" style="display: block; font-weight: 600; color: #1d1d1f; margin-bottom: 8px; font-size: 16px;">Seleziona Beat ({{ beats|length }} disponibili) <span style="color: #ff3b30;">*</span></label>
+            <div style="max-height: 500px; overflow-y: auto; border: 2px solid #e5e5e7; border-radius: 16px; padding: 16px; background: #f8f9fa;">
+              {% for beat in beats %}
+              <div class="beat-selection-item" style="display: flex; align-items: center; justify-content: space-between; padding: 20px; margin-bottom: 12px; background: white; border-radius: 12px; border: 2px solid #f0f0f0; transition: all 0.2s; cursor: pointer; user-select: none;" 
+                   onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#007aff';" 
+                   onmouseout="this.style.background='white'; if(!this.querySelector('input[type=checkbox]').checked) this.style.borderColor='#f0f0f0';">
+                <div class="beat-info-section" style="flex: 1; min-width: 0; pointer-events: none;">
+                  <div class="beat-name" style="font-weight: 600; color: #1d1d1f; margin-bottom: 6px; font-size: 16px;">{{ beat.title }}</div>
+                  <div class="beat-meta" style="font-size: 14px; color: #6c757d; margin-bottom: 10px;">{{ beat.genre }} - {{ beat.mood }} - €{{ "%.2f"|format(beat.price) }}</div>
+                  <div class="beat-badges-inline" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    {% if beat.is_discounted %}
+                    <span class="badge-mini" style="background: rgba(255, 204, 0, 0.1); color: #ffcc00; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;">💸 Scontato {{ beat.discount_percent }}%</span>
+                    {% endif %}
+                    {% if beat.is_exclusive %}
+                    <span class="badge-mini" style="background: rgba(255, 59, 48, 0.1); color: #ff3b30; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;">🔒 Esclusivo</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="beat-checkbox-section" style="margin-left: 20px;">
+                  <input type="checkbox" name="beat_ids" value="{{ beat.id }}" id="beat-{{ beat.id }}" style="width: 24px; height: 24px; cursor: pointer; accent-color: #007aff;" />
+                  <label for="beat-{{ beat.id }}" style="margin-left: 8px; cursor: pointer; display: none;"></label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Riepilogo prezzi (dinamico con JavaScript) -->
+          <div id="price-summary" class="price-summary" style="background: rgba(0, 122, 255, 0.05); padding: 20px; border-radius: 12px; margin-top: 24px; display: none;">
+            <h4 style="margin-bottom: 16px; color: #1d1d1f;">💰 Riepilogo Prezzi</h4>
+            <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>Prezzo singoli beat:</span>
+              <span id="individual-total">€0.00</span>
+            </div>
+            <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span>Prezzo bundle:</span>
+              <span id="bundle-total">€0.00</span>
+            </div>
+            <div class="summary-total" style="font-weight: 700; font-size: 18px; border-top: 2px solid #007aff; padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between;">
+              <span>Sconto:</span>
+              <span id="discount-amount" style="color: #34c759;">€0.00 (0%)</span>
+            </div>
+          </div>
+
+          <!-- Azioni -->
+          <div class="form-actions" style="display: flex; gap: 20px; justify-content: center; margin-top: 40px; flex-wrap: wrap; padding: 20px; background: #f8f9fa; border-radius: 16px; border: 2px solid #e9ecef;">
+            <button type="submit" class="save-all-btn" style="background: linear-gradient(135deg, #34c759, #30d158); color: white; border: none; padding: 18px 40px; border-radius: 16px; font-size: 16px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 6px 25px rgba(52, 199, 89, 0.4); transition: all 0.3s; min-width: 180px; justify-content: center;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 30px rgba(52, 199, 89, 0.5)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 25px rgba(52, 199, 89, 0.4)';">
+              <span style="font-size: 20px;">✅</span>
+              <span>Conferma e Crea</span>
+            </button>
+            <a href="{{ url_for('bundles') }}" class="save-single-btn" style="background: linear-gradient(135deg, #8e8e93, #6d6d70); color: white; border: none; padding: 18px 40px; border-radius: 16px; font-size: 16px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 12px; transition: all 0.3s; min-width: 180px; justify-content: center; box-shadow: 0 4px 15px rgba(142, 142, 147, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(142, 142, 147, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(142, 142, 147, 0.3)';">
+              <span style="font-size: 20px;">❌</span>
+              <span>Annulla</span>
+            </a>
+          </div>
+        </div>
+      </form>
+    {% else %}
+      <!-- Login Required -->
+      <div class="login-container" style="text-align: center; padding: 60px 20px; max-width: 500px; margin: 0 auto;">
+        <div class="login-card" style="background: white; border-radius: 20px; padding: 40px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid #f0f0f0;">
+          <div class="login-header">
+            <div class="login-icon" style="font-size: 60px; margin-bottom: 20px;">🔐</div>
+            <h3 style="font-size: 24px; font-weight: 700; color: #1d1d1f; margin-bottom: 12px;">Accesso Richiesto</h3>
+            <p style="color: #6c757d; font-size: 16px; margin-bottom: 32px;">Devi effettuare il login per creare bundle</p>
+          </div>
+          <a href="{{ url_for('index') }}" style="color: #007aff; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: rgba(0, 122, 255, 0.1); border-radius: 12px;">
+            <span>←</span>
+            <span>Torna alla pagina di login</span>
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  <script>
+    // Gestione pulizia immagini quando si annulla la creazione del bundle
+    async function handleCancelBundle() {
+      const imageKeyInput = document.querySelector('input[name="image_key"]');
+      const imageKey = imageKeyInput ? imageKeyInput.value.trim() : '';
+      
+      if (imageKey) {
+        try {
+          // Elimina l'immagine temporanea da R2
+          const response = await fetch('/api/cleanup-bundle-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image_key: imageKey })
+          });
+          
+          if (response.ok) {
+            console.log('Immagine temporanea eliminata durante l\'annullamento');
+          } else {
+            console.warn('Impossibile eliminare l\'immagine temporanea');
+          }
+        } catch (error) {
+          console.error('Errore durante la pulizia dell\'immagine:', error);
+        }
+      }
+      
+      // Reindirizza alla pagina dei bundle
+      window.location.href = "{{ url_for('bundles') }}";
+    }
+    
+    // Gestione del pulsante browser "indietro"
+    window.addEventListener('beforeunload', function() {
+      const imageKeyInput = document.querySelector('input[name="image_key"]');
+      const imageKey = imageKeyInput ? imageKeyInput.value.trim() : '';
+      
+      if (imageKey) {
+        // Invia richiesta asincrona per pulire l'immagine
+        const formData = new FormData();
+        formData.append('image_key', imageKey);
+        navigator.sendBeacon('/api/cleanup-bundle-image', formData);
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check R2 configuration on page load
+      fetch('/api/r2-status')
+        .then(response => response.json())
+        .then(data => {
+          if (!data.all_configured) {
+            showWarning('⚠️ Configurazione R2 incompleta. Il caricamento immagini potrebbe non funzionare. Controlla il file .env');
+          }
+        })
+        .catch(error => {
+          console.error('Error checking R2 status:', error);
+        });
+
+      const checkboxes = document.querySelectorAll('input[name="beat_ids"]');
+      const bundlePriceInput = document.querySelector('input[name="bundle_price"]');
+
+      // Dati dei beat per calcolo prezzi
+      const beatsData = {
+        {% for beat in beats %}
+        {{ beat.id }}: {{ beat.price }},
+        {% endfor %}
+      };
+
+      function updateBeatSelection() {
+        checkboxes.forEach(checkbox => {
+          const beatItem = checkbox.closest('.beat-selection-item');
+          if (checkbox.checked) {
+            beatItem.style.background = 'rgba(0, 122, 255, 0.1)';
+            beatItem.style.borderColor = '#007aff';
+            beatItem.style.transform = 'scale(1.02)';
+          } else {
+            beatItem.style.background = 'white';
+            beatItem.style.borderColor = '#f0f0f0';
+            beatItem.style.transform = 'scale(1)';
+          }
+        });
+      }
+
+      // Event listeners per selezione beat
+      checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateBeatSelection);
+        
+        // Rendi cliccabile tutto il box del beat
+        const beatItem = cb.closest('.beat-selection-item');
+        beatItem.addEventListener('click', function(e) {
+          // Evita il doppio toggle se si clicca direttamente sul checkbox
+          if (e.target.type !== 'checkbox') {
+            cb.checked = !cb.checked;
+            updateBeatSelection();
+          }
+        });
+        
+        // Aggiunge stile cursor pointer al box
+        beatItem.style.cursor = 'pointer';
+      });
+
+      // Auto-hide flash messages
+      const flashMessages = document.querySelectorAll('.flash-message');
+      flashMessages.forEach(function(message) {
+        setTimeout(function() {
+          message.style.opacity = '0';
+          setTimeout(function() {
+            message.remove();
+          }, 300);
+        }, 5000);
+      });
+      
+      // Inizializza il gestore upload immagini
+      const imageUploadManager = new ImageUploadManager();
+    });
+  </script>
+</body>
+</html>

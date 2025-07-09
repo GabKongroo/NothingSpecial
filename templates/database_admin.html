@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-touch-fullscreen" content="yes" />
+  <title>Amministrazione Database - Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <style>
+    /* iOS Safe Area Support */
+    :root {
+      --safe-area-inset-top: env(safe-area-inset-top);
+      --safe-area-inset-bottom: env(safe-area-inset-bottom);
+      --safe-area-inset-left: env(safe-area-inset-left);
+      --safe-area-inset-right: env(safe-area-inset-right);
+    }
+    
+    body {
+      padding-top: var(--safe-area-inset-top);
+      padding-bottom: var(--safe-area-inset-bottom);
+      padding-left: var(--safe-area-inset-left);
+      padding-right: var(--safe-area-inset-right);
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      border: 1px solid #f0f0f0;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    
+    .stat-icon {
+      font-size: 36px;
+      margin-bottom: 12px;
+    }
+    
+    .stat-number {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1d1d1f;
+      margin-bottom: 6px;
+    }
+    
+    .stat-label {
+      color: #6c757d;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    
+    .admin-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    
+    .action-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      border: 1px solid #f0f0f0;
+      transition: all 0.3s;
+    }
+    
+    .action-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    
+    .action-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #1d1d1f;
+      margin-bottom: 12px;
+    }
+    
+    .action-description {
+      color: #6c757d;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    
+    .action-btn {
+      width: 100%;
+      padding: 16px 24px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    .btn-update {
+      background: linear-gradient(135deg, #007aff, #5856d6);
+      color: white;
+    }
+    
+    .btn-update:hover, .btn-update:active {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 122, 255, 0.3);
+    }
+    
+    .btn-update:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .btn-reset {
+      background: linear-gradient(135deg, #ff3b30, #ff9500);
+      color: white;
+    }
+    
+    .btn-reset:hover, .btn-reset:active {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(255, 59, 48, 0.3);
+    }
+    
+    /* Loading Progress Bar */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    
+    .loading-content {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      margin: var(--safe-area-inset-top) var(--safe-area-inset-right) var(--safe-area-inset-bottom) var(--safe-area-inset-left);
+    }
+    
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #007aff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #007aff, #5856d6);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    
+    .loading-text {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1d1d1f;
+      margin-bottom: 10px;
+    }
+    
+    .loading-subtext {
+      font-size: 14px;
+      color: #6c757d;
+      margin-bottom: 20px;
+    }
+    
+    .loading-status {
+      font-size: 12px;
+      color: #007aff;
+      font-weight: 500;
+      min-height: 16px;
+    }
+    
+    .sold-beats-section {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      border: 1px solid #f0f0f0;
+    }
+    
+    .table-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1d1d1f;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .table-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .beats-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .beats-table th {
+      background: #f8f9fa;
+      padding: 16px 12px;
+      text-align: left;
+      border-bottom: 2px solid #e9ecef;
+      color: #6c757d;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .beats-table td {
+      color: #1d1d1f;
+      font-size: 14px;
+      padding: 16px 12px;
+      border-bottom: 1px solid #e9ecef;
+    }
+    
+    .beats-table tr:hover {
+      background: #f8f9fa;
+    }
+    
+    .beat-title {
+      font-weight: 600;
+      color: #1d1d1f;
+    }
+    
+    .beat-meta {
+      color: #6c757d;
+      font-size: 12px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6c757d;
+    }
+    
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .empty-text {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .empty-subtext {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+    
+    /* Responsive Design for Mobile */
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      
+      .stat-card {
+        padding: 16px;
+      }
+      
+      .stat-number {
+        font-size: 24px;
+      }
+      
+      .stat-icon {
+        font-size: 32px;
+        margin-bottom: 8px;
+      }
+      
+      .admin-actions {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      
+      .action-card {
+        padding: 20px;
+      }
+      
+      .action-btn {
+        padding: 14px 20px;
+        font-size: 15px;
+      }
+      
+      .loading-content {
+        padding: 30px 20px;
+      }
+      
+      .sold-beats-section {
+        padding: 20px 16px;
+      }
+      
+      .beats-table th,
+      .beats-table td {
+        padding: 12px 8px;
+        font-size: 13px;
+      }
+      
+      .table-title {
+        font-size: 18px;
+      }
+    }
+    
+    /* Extra small devices */
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      
+      .stat-card {
+        padding: 14px;
+      }
+      
+      .stat-icon {
+        font-size: 28px;
+        margin-bottom: 6px;
+      }
+      
+      .stat-number {
+        font-size: 20px;
+      }
+      
+      .stat-label {
+        font-size: 11px;
+      }
+      
+      .action-card {
+        padding: 18px;
+      }
+      
+      .action-title {
+        font-size: 16px;
+      }
+      
+      .action-description {
+        font-size: 13px;
+      }
+      
+      .loading-content {
+        padding: 20px 16px;
+      }
+    }
+  </style>
+</head>
+<body class="database-admin-page">
+  <style>
+    /* Nascondi i pulsanti mobili nelle pagine bundle e database */
+    .database-admin-page .mobile-control-btn {
+      display: none !important;
+    }
+  </style>
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Aggiornamento Database</div>
+      <div class="loading-subtext">Scansione in corso su Google Drive...</div>
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+        <div class="progress-text">0%</div>
+      </div>
+      <div class="status-text">Inizializzazione...</div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <div id="modal-container"></div>
+
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <div class="logo-section">
+        <div class="logo-icon">🛠️</div>
+        <h2>Amministrazione Database</h2>
+      </div>
+      {% if session.get('logged_in') %}
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+          <button type="submit" class="logout-btn">
+            <span class="logout-icon">🚪</span>
+            <span class="logout-text">Logout</span>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Navigation -->
+    <nav class="nav-tabs">
+      <a href="{{ url_for('index') }}" class="nav-tab">
+        <span class="nav-tab-icon">🎵</span>
+        <span class="nav-tab-text">Beat</span>
+      </a>
+      <a href="{{ url_for('bundles') }}" class="nav-tab">
+        <span class="nav-tab-icon">📦</span>
+        <span class="nav-tab-text">Bundle</span>
+      </a>
+      <a href="{{ url_for('database_admin') }}" class="nav-tab active">
+        <span class="nav-tab-icon">🗄️</span>
+        <span class="nav-tab-text">Database</span>
+      </a>
+    </nav>
+
+    <main>
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages">
+            {% for category, message in messages %}
+              <div class="flash-message flash-{{ category }}">
+                <span class="flash-icon">
+                  {% if category == 'success' %}✅{% elif category == 'error' %}❌{% else %}ℹ️{% endif %}
+                </span>
+                <span class="flash-text">{{ message }}</span>
+                <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <!-- Database Statistics -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🎵</div>
+          <div class="stat-number">{{ stats.total_beats }}</div>
+          <div class="stat-label">Beat Totali</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon">💎</div>
+          <div class="stat-number">{{ stats.exclusive_beats }}</div>
+          <div class="stat-label">Beat Esclusivi</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon">📦</div>
+          <div class="stat-number">{{ stats.active_bundles }}</div>
+          <div class="stat-label">Bundle Attivi</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-number">{{ stats.sold_exclusive_count }}</div>
+          <div class="stat-label">Beat Esclusivi Venduti</div>
+        </div>
+      </section>
+
+      <!-- Admin Actions -->
+      <section class="admin-actions">
+        <div class="action-card">
+          <div class="action-title">
+            <span>🔄</span>
+            <span>Aggiorna Database</span>
+          </div>
+          <div class="action-description">
+            Scansiona Google Drive e aggiorna il database con nuovi beat. Carica automaticamente i file su Cloudflare R2.
+          </div>
+          <button id="update-db-btn" class="action-btn btn-update" onclick="updateDatabase()">
+            <span>🔄</span>
+            <span>Avvia Aggiornamento</span>
+          </button>
+        </div>
+        
+        <div class="action-card">
+          <div class="action-title">
+            <span>⚠️</span>
+            <span>Reset Database</span>
+          </div>
+          <div class="action-description">
+            <strong>ATTENZIONE!</strong> Elimina tutti i dati esistenti e reinizializza il database. Questa azione non può essere annullata.
+          </div>
+          <button id="reset-db-btn" class="action-btn btn-reset" onclick="resetDatabase()">
+            <span>⚠️</span>
+            <span>Reset Database</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Tabella Beat Esclusivi Venduti -->
+      {% if sold_beats %}
+      <section class="sold-beats-section">
+        <h2 class="table-title">
+          <span>💰</span>
+          <span>Beat Esclusivi Venduti</span>
+        </h2>
+        
+        <div class="table-responsive">
+          <table class="beats-table">
+            <thead>
+              <tr>
+                <th>Beat</th>
+                <th>Genere</th>
+                <th>Mood</th>
+                <th>Prezzo</th>
+                <th>Email</th>
+                <th>Data Vendita</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for beat in sold_beats %}
+              <tr>
+                <td>
+                  <div class="beat-title">{{ beat.beat_title }}</div>
+                </td>
+                <td>
+                  <div class="beat-meta">{{ beat.genre }}</div>
+                </td>
+                <td>
+                  <div class="beat-meta">{{ beat.mood }}</div>
+                </td>
+                <td>
+                  <strong>${{ "%.2f"|format(beat.price) }}</strong>
+                </td>
+                <td>
+                  <div class="beat-meta">{{ beat.payer_email }}</div>
+                </td>
+                <td>
+                  <div class="beat-meta">{{ beat.created_at.strftime('%d/%m/%Y %H:%M') if beat.created_at else 'N/A' }}</div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {% else %}
+      <section class="sold-beats-section">
+        <div class="empty-state">
+          <div class="empty-icon">💰</div>
+          <div class="empty-text">Nessun Beat Esclusivo Venduto</div>
+          <div class="empty-subtext">I beat esclusivi venduti appariranno qui quando ci saranno delle vendite.</div>
+        </div>
+      </section>
+      {% endif %}
+
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  <script>
+    // Auto-hide flash messages
+    document.addEventListener('DOMContentLoaded', function() {
+      const flashMessages = document.querySelectorAll('.flash-message');
+      flashMessages.forEach(function(message) {
+        setTimeout(function() {
+          message.style.opacity = '0';
+          setTimeout(function() {
+            message.remove();
+          }, 300);
+        }, 5000);
+      });
+    });
+  </script>
+</body>
+</html>
